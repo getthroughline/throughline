@@ -68,6 +68,29 @@ const TOOLS = [
     },
   },
   {
+    name: "draft_persona",
+    description:
+      "Author/edit this self's persona, ONLY when the user explicitly asks to create or change it. " +
+      "Interview the user (who the self should be, who they are, the relationship), then draft the " +
+      "documents and call this. Each doc is a markdown string. Slots: 'soul' (core: character, " +
+      "voice, principles), 'identity' (fuller dossier), 'user' (about the user). The drafts are " +
+      "STAGED — show them to the user and call confirm_events with the returned ids only after they approve.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        docs: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: { slot: { type: "string", enum: ["soul", "identity", "user"] }, content: { type: "string" } },
+            required: ["slot", "content"],
+          },
+        },
+      },
+      required: ["docs"],
+    },
+  },
+  {
     name: "gate",
     description: "Check whether a proposed action is allowed (block/confirm/allow) before doing it.",
     inputSchema: {
@@ -104,6 +127,8 @@ async function callTool(name, args) {
       }
       return { rejected };
     }
+    case "draft_persona":
+      return post("/capture/draft-persona", { docs: args.docs ?? [] });
     case "gate":
       return post("/gate", { tool: args.tool, text: args.text, tags: args.tags });
     default:
