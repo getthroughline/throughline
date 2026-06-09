@@ -67,14 +67,12 @@ Early. Building the foundation in this order:
 
 ## Install (into Claude Code)
 
-Requires Node 24+. Install the daemon + `throughline` CLI, sign in, create your self, then
-register the plugin in Claude Code:
+Requires Node 24+. Install the daemon + `throughline` CLI (this creates a default self with safe
+defaults), sign in, then register the plugin in Claude Code:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/nianliu-tech/throughline/main/install.sh | sh
 throughline login
-throughline self create "you/assistant" --pack base,investment
-export THROUGHLINE_SELF="you/assistant"
 ```
 
 Then, inside Claude Code (restart it afterward):
@@ -82,6 +80,13 @@ Then, inside Claude Code (restart it afterward):
 ```
 /plugin marketplace add nianliu-tech/throughline
 /plugin install throughline@throughline
+```
+
+That's it — no env vars, no setup. Power users can run multiple agents:
+
+```sh
+throughline self create "me/investor" --pack base,investment
+throughline self use me/investor
 ```
 
 Check anything with `throughline status`. Full walkthrough and uninstall: **[INSTALL.md](INSTALL.md)**.

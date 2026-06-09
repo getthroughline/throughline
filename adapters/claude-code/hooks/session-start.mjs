@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // SessionStart hook: inject the self's context pack (the catch-up / always-on summary) plus a
 // short instruction telling the host model when to use the Throughline MCP tools.
-import { get, getText, safe, SELF } from "../lib/daemon.mjs";
+import { get, getText, safe, self } from "../lib/daemon.mjs";
 
+const SELF = await safe(() => self(), "default/self");
 const context = await safe(() => getText("/context"), "");
 
 // What happened since this body was last here (advances the cursor).
