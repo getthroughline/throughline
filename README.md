@@ -67,12 +67,13 @@ Early. Building the foundation in this order:
 
 ## Install (into Claude Code)
 
-Requires Node 24+. Install the daemon + `throughline` CLI (this creates a default self with safe
-defaults), sign in, then register the plugin in Claude Code:
+Requires Node 24+. Install, sign in, then **create your self** — a guided step that gives the
+agent its persona (there is no default persona; creating a self is deliberate):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/nianliu-tech/throughline/main/install.sh | sh
 throughline login
+throughline self create assistant            # guided: who it is, about you, your relationship
 ```
 
 Then, inside Claude Code (restart it afterward):
@@ -82,12 +83,8 @@ Then, inside Claude Code (restart it afterward):
 /plugin install throughline@throughline
 ```
 
-That's it — no env vars, no setup. Power users can run multiple agents:
-
-```sh
-throughline self create "investor" --pack base,investment
-throughline self use investor
-```
+With the cloud, creating a self becomes a guided form on the web. Run multiple agents anytime
+(`throughline self create investor --pack base,investment` / `throughline self use investor`).
 
 Check anything with `throughline status`. Full walkthrough and uninstall: **[INSTALL.md](INSTALL.md)**.
 See it working in 2 minutes: **[DEMO.md](DEMO.md)**.
