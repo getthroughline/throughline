@@ -47,6 +47,27 @@ const TOOLS = [
   },
   { name: "pending", description: "List candidate events staged for confirmation.", inputSchema: { type: "object", properties: {} } },
   {
+    name: "confirm_events",
+    description:
+      "Write staged candidate events into the permanent log. ONLY call this after the user has " +
+      "explicitly approved them in this conversation — never auto-confirm. ids come from " +
+      "propose_events or pending.",
+    inputSchema: {
+      type: "object",
+      properties: { ids: { type: "array", items: { type: "string" } } },
+      required: ["ids"],
+    },
+  },
+  {
+    name: "reject_events",
+    description: "Discard staged candidate events the user declined. ids from propose_events or pending.",
+    inputSchema: {
+      type: "object",
+      properties: { ids: { type: "array", items: { type: "string" } } },
+      required: ["ids"],
+    },
+  },
+  {
     name: "gate",
     description: "Check whether a proposed action is allowed (block/confirm/allow) before doing it.",
     inputSchema: {
@@ -67,6 +88,22 @@ async function callTool(name, args) {
       return post("/capture/propose", { events: args.events ?? [], source: "claude-code" });
     case "pending":
       return get("/capture/pending");
+    case "confirm_events": {
+      const confirmed = [], notFound = [];
+      for (const id of args.ids ?? []) {
+        try { confirmed.push((await post("/capture/confirm", { id })).confirmed.id); }
+        catch { notFound.push(id); }
+      }
+      return { confirmed, notFound };
+    }
+    case "reject_events": {
+      const rejected = [];
+      for (const id of args.ids ?? []) {
+        const r = await post("/capture/reject", { id }).catch(() => ({ rejected: false }));
+        if (r.rejected) rejected.push(id);
+      }
+      return { rejected };
+    }
     case "gate":
       return post("/gate", { tool: args.tool, text: args.text, tags: args.tags });
     default:

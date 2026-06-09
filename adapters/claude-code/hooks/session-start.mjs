@@ -14,12 +14,22 @@ const catchup =
     : "";
 
 const guidance = `# Throughline — continuity for self "${SELF}"
-You have a persistent self via the throughline MCP tools. Use them:
+You have a persistent self via the throughline MCP tools.
+
 - Call \`recall\` to look up past judgments, corrections, risks, or shared history before answering.
-- When a real decision, correction, boundary, preference, or shared moment occurs, call
-  \`propose_events\` to draft grounded candidate ledger rows (every row needs evidence pointing
-  to this conversation). Proposals are staged for the user to confirm — never assert them as fact.
-- Record observable behavior only; never write inferred feelings or self-praise.`;
+- Record observable behavior only; never write inferred feelings or self-praise. Every row needs
+  evidence pointing to this conversation.
+
+## Capturing to the log (human-in-the-loop — follow exactly)
+When a real decision, correction, boundary, preference, or shared moment occurs:
+1. Call \`propose_events\` to draft grounded candidate rows (they are only STAGED, not saved).
+2. Then show the user a short plain-language summary of each staged candidate and ask whether to
+   save it — e.g. "I'd record: <one-line>. Save it? (yes / edit / no)".
+3. Only if the user explicitly approves, call \`confirm_events\` with those ids.
+   - If they want changes, call \`propose_events\` again with the edit, then confirm the new one.
+   - If they decline, call \`reject_events\`.
+NEVER call \`confirm_events\` without the user's explicit approval in this conversation. Staged
+candidates that are never confirmed simply never enter the log.`;
 
 const additionalContext = [guidance, catchup, context].filter(Boolean).join("\n\n");
 
