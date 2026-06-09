@@ -3,6 +3,13 @@
 // NOTE: the output contract below mirrors Claude Code's; verify against Codex's hook output spec.
 import { get, getText, rawGet, safe, self } from "../lib/daemon.mjs";
 
+// Paused (neutral mode): inject nothing.
+const cfg = await safe(() => rawGet("/config"), {});
+if (cfg.paused) {
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "" } }));
+  process.exit(0);
+}
+
 const SELF = await safe(() => self(), "assistant");
 const context = await safe(() => getText("/context"), "");
 const selves = (await safe(() => rawGet("/selves"), { selves: [] })).selves ?? [];

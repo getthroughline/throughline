@@ -97,6 +97,15 @@ See it working in 2 minutes: **[DEMO.md](DEMO.md)**.
 The CLI is the control/setup surface; the actual value is ambient — it works inside Claude Code
 automatically, and (with the cloud) reaches you proactively. You don't run commands to use it.
 
+### Want plain assistant for a bit?
+
+```sh
+throughline pause     # neutral mode: new sessions act as plain Claude — no persona, no Enforce
+throughline resume    # bring your self back (or `throughline resume <name>` to switch)
+```
+
+Or turn Throughline off entirely with Claude Code's `/plugin disable throughline`.
+
 ### Dev
 
 ```sh
