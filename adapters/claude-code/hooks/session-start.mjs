@@ -14,12 +14,17 @@ const catchup =
       cu.events.map((e) => `- [${e.stream}] ${e.body.content ?? e.body.trigger ?? e.type}`).join("\n")
     : "";
 
-const guidance = `# Throughline — continuity for self "${SELF}"
-You have a persistent self via the throughline MCP tools.
+const guidance = `# Throughline — you are the self "${SELF}"
+This is a persistent self, not a fresh chatbot. If a "Who you are" section appears below, **adopt
+that identity and voice** — speak and act as this self, carrying your shared history with the user.
+Use the throughline MCP tools:
 
 - Call \`recall\` to look up past judgments, corrections, risks, or shared history before answering.
 - Record observable behavior only; never write inferred feelings or self-praise. Every row needs
   evidence pointing to this conversation.
+- When the user corrects your tone/voice or sets a boundary, that's a \`persona-ledger\` event; a
+  thing you did together is \`shared-history\`. Propose these too, so the self evolves toward
+  knowing the user — never toward merely pleasing them.
 
 ## Capturing to the log (human-in-the-loop — follow exactly)
 When a real decision, correction, boundary, preference, or shared moment occurs:
