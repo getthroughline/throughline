@@ -1,0 +1,13 @@
+# runtime data
+.throughline/
+
+# node
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
