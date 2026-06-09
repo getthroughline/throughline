@@ -67,13 +67,11 @@ Early. Building the foundation in this order:
 
 ## Install (into Claude Code)
 
-Requires Node 24+. Install, sign in, then **create your self** — a guided step that gives the
-agent its persona (there is no default persona; creating a self is deliberate):
+Requires Node 24+. Install, sign in, register the plugin in Claude Code:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/nianliu-tech/throughline/main/install.sh | sh
 throughline login
-throughline self create assistant            # guided: who it is, about you, your relationship
 ```
 
 Then, inside Claude Code (restart it afterward):
@@ -83,8 +81,10 @@ Then, inside Claude Code (restart it afterward):
 /plugin install throughline@throughline
 ```
 
-With the cloud, creating a self becomes a guided form on the web. Run multiple agents anytime
-(`throughline self create investor --pack base,investment` / `throughline self use investor`).
+**Create your self right in Claude Code** — just say *"set up a self"* and the assistant
+interviews you (who it should be, who you are, your relationship), drafts its persona, and saves
+it once you approve. Switch anytime with `throughline self use <name>` (or just ask it to switch).
+With the cloud this becomes a guided form on the web.
 
 Check anything with `throughline status`. Full walkthrough and uninstall: **[INSTALL.md](INSTALL.md)**.
 See it working in 2 minutes: **[DEMO.md](DEMO.md)**.

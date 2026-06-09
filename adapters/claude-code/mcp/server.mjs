@@ -2,7 +2,7 @@
 // Minimal MCP stdio server (JSON-RPC 2.0, newline-delimited), no SDK / no deps.
 // Exposes the local throughlined API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
-import { get, post } from "../lib/daemon.mjs";
+import { get, post, rawGet, rawPost } from "../lib/daemon.mjs";
 
 const TOOLS = [
   {
@@ -68,6 +68,31 @@ const TOOLS = [
     },
   },
   {
+    name: "list_selves",
+    description: "List the user's selves (agents) and which is the default/active one.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "create_self",
+    description:
+      "Create a new self (agent) — only when the user asks. Seeded with the 'base' safety pack by " +
+      "default. The first self becomes the default. After creating, run the persona interview and " +
+      "call draft_persona to give it an identity.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        packs: { type: "array", items: { type: "string" }, description: "default ['base']" },
+      },
+      required: ["name"],
+    },
+  },
+  {
+    name: "use_self",
+    description: "Switch the default/active self to <name> — only when the user asks.",
+    inputSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
+  },
+  {
     name: "draft_persona",
     description:
       "Author/edit this self's persona, ONLY when the user explicitly asks to create or change it. " +
@@ -127,6 +152,14 @@ async function callTool(name, args) {
       }
       return { rejected };
     }
+    case "list_selves": {
+      const [selves, cfg] = await Promise.all([rawGet("/selves"), rawGet("/config")]);
+      return { selves: selves.selves, default: cfg.default_self ?? null };
+    }
+    case "create_self":
+      return rawPost(`/selves/${encodeURIComponent(args.name)}`, { packs: args.packs ?? ["base"] });
+    case "use_self":
+      return rawPost("/config", { default_self: args.name });
     case "draft_persona":
       return post("/capture/draft-persona", { docs: args.docs ?? [] });
     case "gate":

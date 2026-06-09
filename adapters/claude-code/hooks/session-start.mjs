@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // SessionStart hook: inject the self's context pack (the catch-up / always-on summary) plus a
 // short instruction telling the host model when to use the Throughline MCP tools.
-import { get, getText, safe, self } from "../lib/daemon.mjs";
+import { get, getText, rawGet, safe, self } from "../lib/daemon.mjs";
 
-const SELF = await safe(() => self(), "default/self");
+const SELF = await safe(() => self(), "assistant");
 const context = await safe(() => getText("/context"), "");
+const selves = (await safe(() => rawGet("/selves"), { selves: [] })).selves ?? [];
+const noSelf = selves.length === 0;
 
 // What happened since this body was last here (advances the cursor).
 const cu = await safe(() => get("/catchup?body=claude-code"), { events: [], count: 0 });
@@ -29,14 +31,14 @@ Use the throughline MCP tools:
   guardrails are owner-only — you cannot change them via Capture; don't propose \`persona\` or
   \`permission-policy\` events.
 
-## Creating or editing a persona (the recommended way — only when the user asks)
-If the user asks to create this self / set up or change its persona, run a short interview:
-ask who the self should be (character, voice, principles), who the user is, and the relationship.
-Then draft markdown documents and call \`draft_persona\` with slots \`soul\` (core), \`identity\`
-(fuller dossier), \`user\` (about the user). Show the drafts; call \`confirm_events\` with the
-returned ids only after the user approves. This is the owner authoring with your help — fine
-because the user drives it and confirms. After it's saved, the user switches selves with
-\`throughline self use <name>\`.
+## Selves & personas (the recommended flow — only when the user asks)
+- **Create a self:** call \`create_self\` (seeded with safety defaults), then run a short interview
+  — who it should be (character, voice, principles), who the user is, the relationship — draft
+  markdown docs and call \`draft_persona\` with slots \`soul\` (core), \`identity\` (fuller dossier),
+  \`user\` (about the user). Show the drafts; call \`confirm_events\` only after the user approves.
+- **Switch the active self:** call \`use_self\`. **See selves:** \`list_selves\`.
+The persona and guardrails are owner-only — only this explicit, user-approved flow writes them;
+never change them during normal work.${noSelf ? "\n\n## First run\nThere is no self yet. Greet the user and offer to set one up using the flow above (create_self -> interview -> draft_persona -> confirm)." : ""}
 
 ## Capturing to the log (human-in-the-loop — follow exactly)
 When a real decision, correction, boundary, preference, or shared moment occurs:

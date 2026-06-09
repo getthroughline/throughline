@@ -45,6 +45,22 @@ export async function post(sub, body) {
   return res.json();
 }
 
+// Daemon-level calls (not scoped to the current self): create/list selves, set default.
+export async function rawGet(path) {
+  const res = await fetch(`${BASE}${path}`);
+  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  return res.json();
+}
+export async function rawPost(path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body ?? {}),
+  });
+  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  return res.json();
+}
+
 // Best-effort: if the daemon is down, the adapter must never break the host session.
 export async function safe(fn, fallback) {
   try {
