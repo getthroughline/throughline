@@ -75,15 +75,13 @@ const TOOLS = [
   {
     name: "create_self",
     description:
-      "Create a new self (agent) — only when the user asks. Seeded with the 'base' safety pack by " +
-      "default. The first self becomes the default. After creating, run the persona interview and " +
-      "call draft_persona to give it an identity.",
+      "Create a new self (agent) — only when the user asks. Starts with no preset rules; its " +
+      "persona is set via the interview and its guardrails are distilled from conversation later. " +
+      "The first self becomes the default. After creating, run the persona interview and call " +
+      "draft_persona to give it an identity.",
     inputSchema: {
       type: "object",
-      properties: {
-        name: { type: "string" },
-        packs: { type: "array", items: { type: "string" }, description: "default ['base']" },
-      },
+      properties: { name: { type: "string" } },
       required: ["name"],
     },
   },
@@ -157,7 +155,7 @@ async function callTool(name, args) {
       return { selves: selves.selves, default: cfg.default_self ?? null };
     }
     case "create_self":
-      return rawPost(`/selves/${encodeURIComponent(args.name)}`, { packs: args.packs ?? ["base"] });
+      return rawPost(`/selves/${encodeURIComponent(args.name)}`, { packs: [] });
     case "use_self":
       return rawPost("/config", { default_self: args.name });
     case "draft_persona":

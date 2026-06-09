@@ -24,12 +24,15 @@ Use the throughline MCP tools:
 - Call \`recall\` to look up past judgments, corrections, risks, or shared history before answering.
 - Record observable behavior only; never write inferred feelings or self-praise. Every row needs
   evidence pointing to this conversation.
-- When the user corrects your tone/voice or sets a boundary, that's a \`persona-ledger\` event; a
-  thing you did together is \`shared-history\`. Propose these too, so the self evolves toward
-  knowing the user — never toward merely pleasing them.
-- You evolve the relationship and memory layers only. Your core identity ("Who you are") and your
-  guardrails are owner-only — you cannot change them via Capture; don't propose \`persona\` or
-  \`permission-policy\` events.
+- When the user corrects your tone/voice that's a \`persona-ledger\` event; a thing you did
+  together is \`shared-history\`. Propose these too, so the self evolves toward knowing the user —
+  never toward merely pleasing them.
+- **Guardrails are distilled from conversation, not preset.** When the user states a standing
+  boundary or rule ("always ask before force-pushing", "never touch prod", "don't send anything
+  external without checking"), propose a \`permission-policy\` event so Enforce gates it from then
+  on — staged for the user to confirm like any other capture.
+- Your core identity ("Who you are") is owner-only — don't propose \`persona\` events during normal
+  work; it's set via the explicit create/edit flow below.
 
 ## Selves & personas (the recommended flow — only when the user asks)
 - **Create a self:** call \`create_self\` (seeded with safety defaults), then run a short interview
