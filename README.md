@@ -65,7 +65,24 @@ Early. Building the foundation in this order:
 4. Cloud Heartbeat + channels (always-on, proactive)
 5. Account / billing / dashboard (web)
 
-## Run the daemon (dev)
+## Install (into Claude Code)
+
+Two steps: run the always-on local daemon, then register the plugin in Claude Code.
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/nianliu-tech/throughline/main/install.sh | sh
+```
+
+Then, inside Claude Code:
+
+```
+/plugin marketplace add nianliu-tech/throughline
+/plugin install throughline@throughline
+```
+
+Full walkthrough, verification, and uninstall: **[INSTALL.md](INSTALL.md)**.
+
+### Run the daemon directly (dev)
 
 Requires Node 24+ (runs TypeScript directly, no build, no dependencies).
 
