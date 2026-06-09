@@ -67,29 +67,34 @@ Early. Building the foundation in this order:
 
 ## Install (into Claude Code)
 
-Two steps: run the always-on local daemon, then register the plugin in Claude Code.
+Requires Node 24+. Install the daemon + `throughline` CLI, sign in, create your self, then
+register the plugin in Claude Code:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/nianliu-tech/throughline/main/install.sh | sh
+throughline login
+throughline self create "you/assistant" --pack base,investment
+export THROUGHLINE_SELF="you/assistant"
 ```
 
-Then, inside Claude Code:
+Then, inside Claude Code (restart it afterward):
 
 ```
 /plugin marketplace add nianliu-tech/throughline
 /plugin install throughline@throughline
 ```
 
-Full walkthrough, verification, and uninstall: **[INSTALL.md](INSTALL.md)**.
+Check anything with `throughline status`. Full walkthrough and uninstall: **[INSTALL.md](INSTALL.md)**.
 
-### Run the daemon directly (dev)
+The CLI is the control/setup surface; the actual value is ambient — it works inside Claude Code
+automatically, and (with the cloud) reaches you proactively. You don't run commands to use it.
 
-Requires Node 24+ (runs TypeScript directly, no build, no dependencies).
+### Dev
 
 ```sh
 cd daemon
-npm start          # serves the local API on 127.0.0.1:8787
-curl localhost:8787/healthz
+npm start          # = throughline daemon — serves the local API on 127.0.0.1:8787
+npm run smoke      # store + enforce + capture + selves tests
 ```
 
 ## Domain packs
