@@ -1,0 +1,6 @@
+{
+  "throughline": {
+    "command": "throughline",
+    "args": ["mcp"]
+  }
+}

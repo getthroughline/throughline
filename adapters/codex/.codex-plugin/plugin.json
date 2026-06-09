@@ -1,0 +1,14 @@
+{
+  "name": "throughline",
+  "version": "0.0.1",
+  "description": "Throughline continuity for Codex: a persistent self (persona + memory), Capture with confirmation, and the same tools as the Claude Code plugin.",
+  "author": { "name": "nianliu-tech" },
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "hooks": "./hooks/hooks.json",
+  "interface": {
+    "displayName": "Throughline",
+    "shortDescription": "Own the self, BYO body — persistent persona + memory",
+    "category": "Productivity"
+  }
+}

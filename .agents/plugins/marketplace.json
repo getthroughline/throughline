@@ -1,0 +1,11 @@
+{
+  "name": "throughline",
+  "plugins": [
+    {
+      "name": "throughline",
+      "source": { "source": "local", "path": "./adapters/codex" },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Productivity"
+    }
+  ]
+}
