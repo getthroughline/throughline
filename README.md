@@ -85,6 +85,7 @@ Then, inside Claude Code (restart it afterward):
 ```
 
 Check anything with `throughline status`. Full walkthrough and uninstall: **[INSTALL.md](INSTALL.md)**.
+See it working in 2 minutes: **[DEMO.md](DEMO.md)**.
 
 The CLI is the control/setup surface; the actual value is ambient — it works inside Claude Code
 automatically, and (with the cloud) reaches you proactively. You don't run commands to use it.
