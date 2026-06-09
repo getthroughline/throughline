@@ -1,21 +1,39 @@
-// Thin client for the local throughlined API. The adapter owns no logic — it only translates
-// between Claude Code and the daemon.
+// Thin client for the Throughline API. Cloud-first: talks to the cloud by default; point
+// THROUGHLINE_URL at a local daemon (http://127.0.0.1:8787) to self-host.
+import { readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 
-const BASE = process.env.THROUGHLINE_URL ?? "http://127.0.0.1:8787";
+const CLOUD = "https://throughline-cloud-production.up.railway.app";
+const BASE = process.env.THROUGHLINE_URL ?? CLOUD;
 
-// Which self this session maps to. Resolution order (NOT env-only — GUI Claude Code has no shell
-// env): THROUGHLINE_SELF -> the daemon's configured default_self -> "default/self".
+// API key: env (e.g. set in the MCP server config) -> ~/.throughline/auth.json (saved by
+// `throughline use-key`). Sent as a Bearer. A local self-host daemon ignores it.
+function apiKey() {
+  if (process.env.THROUGHLINE_API_KEY) return process.env.THROUGHLINE_API_KEY;
+  try {
+    return JSON.parse(readFileSync(join(homedir(), ".throughline", "auth.json"), "utf8")).token ?? null;
+  } catch {
+    return null;
+  }
+}
+function authHeaders(extra = {}) {
+  const key = apiKey();
+  return key ? { authorization: `Bearer ${key}`, ...extra } : extra;
+}
+
+// Which self this session maps to: THROUGHLINE_SELF -> the API's default_self -> "assistant".
 let cachedSelf;
 export async function self() {
   if (cachedSelf) return cachedSelf;
   if (process.env.THROUGHLINE_SELF) return (cachedSelf = process.env.THROUGHLINE_SELF);
   try {
-    const res = await fetch(`${BASE}/config`);
+    const res = await fetch(`${BASE}/config`, { headers: authHeaders() });
     if (res.ok) {
       const cfg = await res.json();
       if (cfg.default_self) return (cachedSelf = cfg.default_self);
     }
-  } catch { /* daemon down — fall through */ }
+  } catch { /* unreachable — fall through */ }
   return (cachedSelf = "assistant");
 }
 
@@ -24,53 +42,45 @@ async function selfPath(sub) {
 }
 
 export async function get(sub) {
-  const res = await fetch(await selfPath(sub));
+  const res = await fetch(await selfPath(sub), { headers: authHeaders() });
   if (!res.ok) throw new Error(`${sub} -> ${res.status}`);
   return res.json();
 }
-
 export async function getText(sub) {
-  const res = await fetch(await selfPath(sub));
+  const res = await fetch(await selfPath(sub), { headers: authHeaders() });
   if (!res.ok) throw new Error(`${sub} -> ${res.status}`);
   return res.text();
 }
-
 export async function post(sub, body) {
   const res = await fetch(await selfPath(sub), {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: authHeaders({ "content-type": "application/json" }),
     body: JSON.stringify(body ?? {}),
   });
   if (!res.ok) throw new Error(`${sub} -> ${res.status}`);
   return res.json();
 }
 
-// Daemon-level calls (not scoped to the current self): create/list selves, set default.
 export async function rawGet(path) {
-  const res = await fetch(`${BASE}${path}`);
+  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
   if (!res.ok) throw new Error(`${path} -> ${res.status}`);
   return res.json();
 }
 export async function rawPost(path, body) {
   const res = await fetch(`${BASE}${path}`, {
     method: "POST",
-    headers: { "content-type": "application/json" },
+    headers: authHeaders({ "content-type": "application/json" }),
     body: JSON.stringify(body ?? {}),
   });
   if (!res.ok) throw new Error(`${path} -> ${res.status}`);
   return res.json();
 }
 export async function rawDelete(path) {
-  const res = await fetch(`${BASE}${path}`, { method: "DELETE" });
+  const res = await fetch(`${BASE}${path}`, { method: "DELETE", headers: authHeaders() });
   if (!res.ok) throw new Error(`${path} -> ${res.status}`);
   return res.json();
 }
 
-// Best-effort: if the daemon is down, the adapter must never break the host session.
 export async function safe(fn, fallback) {
-  try {
-    return await fn();
-  } catch {
-    return fallback;
-  }
+  try { return await fn(); } catch { return fallback; }
 }
