@@ -16,7 +16,7 @@ export async function self() {
       if (cfg.default_self) return (cachedSelf = cfg.default_self);
     }
   } catch { /* daemon down — fall through */ }
-  return (cachedSelf = "default/self");
+  return (cachedSelf = "assistant");
 }
 
 async function selfPath(sub) {

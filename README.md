@@ -85,8 +85,8 @@ Then, inside Claude Code (restart it afterward):
 That's it — no env vars, no setup. Power users can run multiple agents:
 
 ```sh
-throughline self create "me/investor" --pack base,investment
-throughline self use me/investor
+throughline self create "investor" --pack base,investment
+throughline self use investor
 ```
 
 Check anything with `throughline status`. Full walkthrough and uninstall: **[INSTALL.md](INSTALL.md)**.
