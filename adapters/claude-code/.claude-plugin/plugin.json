@@ -1,6 +1,6 @@
 {
   "name": "throughline",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Throughline continuity for Claude Code: Enforce gating, self-context injection, and Capture of grounded ledger events.",
   "mcpServers": {
     "throughline": {

@@ -60,6 +60,11 @@ export async function rawPost(path, body) {
   if (!res.ok) throw new Error(`${path} -> ${res.status}`);
   return res.json();
 }
+export async function rawDelete(path) {
+  const res = await fetch(`${BASE}${path}`, { method: "DELETE" });
+  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  return res.json();
+}
 
 // Best-effort: if the daemon is down, the adapter must never break the host session.
 export async function safe(fn, fallback) {

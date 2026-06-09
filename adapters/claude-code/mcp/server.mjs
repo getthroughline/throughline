@@ -2,7 +2,7 @@
 // Minimal MCP stdio server (JSON-RPC 2.0, newline-delimited), no SDK / no deps.
 // Exposes the local throughlined API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
-import { get, getText, post, rawGet, rawPost } from "../lib/daemon.mjs";
+import { get, getText, post, rawDelete, rawGet, rawPost } from "../lib/daemon.mjs";
 
 const TOOLS = [
   {
@@ -99,6 +99,21 @@ const TOOLS = [
     inputSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
   },
   {
+    name: "pause",
+    description: "Neutral mode — act as plain Claude (no persona, no Enforce). Only when the user asks. Takes effect in new sessions.",
+    inputSchema: { type: "object", properties: {} },
+  },
+  {
+    name: "resume",
+    description: "Exit neutral mode and bring the self back; pass `name` to switch to a specific self.",
+    inputSchema: { type: "object", properties: { name: { type: "string" } } },
+  },
+  {
+    name: "delete_self",
+    description: "Delete a self and ALL its data — only after the user explicitly confirms the name. Cannot be undone.",
+    inputSchema: { type: "object", properties: { name: { type: "string" } }, required: ["name"] },
+  },
+  {
     name: "draft_persona",
     description:
       "Author/edit this self's persona, ONLY when the user explicitly asks to create or change it. " +
@@ -167,12 +182,18 @@ async function callTool(name, args) {
     }
     case "list_selves": {
       const [selves, cfg] = await Promise.all([rawGet("/selves"), rawGet("/config")]);
-      return { selves: selves.selves, default: cfg.default_self ?? null };
+      return { selves: selves.selves, default: cfg.default_self ?? null, paused: !!cfg.paused };
     }
     case "create_self":
       return rawPost(`/selves/${encodeURIComponent(args.name)}`, { packs: [] });
     case "use_self":
       return rawPost("/config", { default_self: args.name });
+    case "pause":
+      return rawPost("/config", { paused: true });
+    case "resume":
+      return rawPost("/config", args.name ? { default_self: args.name } : { paused: false });
+    case "delete_self":
+      return rawDelete(`/selves/${encodeURIComponent(args.name)}`);
     case "draft_persona":
       return post("/capture/draft-persona", { docs: args.docs ?? [] });
     case "gate":
@@ -212,12 +233,16 @@ async function handle(msg) {
 }
 
 let buffer = "";
+let queue = Promise.resolve(); // process requests in arrival order (avoid mutate/read races)
 process.stdin.on("data", (chunk) => {
   buffer += chunk.toString("utf8");
   let nl;
   while ((nl = buffer.indexOf("\n")) >= 0) {
     const line = buffer.slice(0, nl).trim();
     buffer = buffer.slice(nl + 1);
-    if (line) handle(JSON.parse(line)).catch(() => {});
+    if (line) {
+      const msg = JSON.parse(line);
+      queue = queue.then(() => handle(msg).catch(() => {}));
+    }
   }
 });
