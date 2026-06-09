@@ -138,7 +138,10 @@ const TOOLS = [
   },
   {
     name: "gate",
-    description: "Check whether a proposed action is allowed (block/confirm/allow) before doing it.",
+    description:
+      "Advisory: check a borderline action against your standing rules + open risks. Returns what " +
+      "it would trip and why — you decide and surface to the user. Not a block; Throughline shapes " +
+      "judgment, it does not intercept tool calls.",
     inputSchema: {
       type: "object",
       properties: { tool: { type: "string" }, text: { type: "string" }, tags: { type: "array", items: { type: "string" } } },

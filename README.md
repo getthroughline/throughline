@@ -42,7 +42,7 @@ BODY (reactive)   Claude Code | OpenClaw | Codex | Cursor
    thin adapter: hooks + MCP proxy
 ─────────────────────────────────────────────────────────
 LOCAL RUNTIME     throughlined (this repo, open source)
-   event store · projections · recall · Enforce · Capture
+   event store · projections · recall · Capture · discipline (in-context)
 ─────────────────────────────────────────────────────────
 CLOUD (optional, separate repo)
    Sync · Capture · Score · Heartbeat + channels · Export

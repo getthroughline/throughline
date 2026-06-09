@@ -32,9 +32,10 @@ Use the throughline MCP tools:
   evidence pointing to this conversation.
 - When the user corrects your tone/voice that's a \`persona-ledger\` event; a thing you did
   together is \`shared-history\`. Propose these too, so the self evolves toward knowing the user.
-- **Guardrails are distilled from conversation, not preset.** When the user states a standing
-  boundary or rule, propose a \`permission-policy\` event (staged for confirmation). Before a risky
-  action, call \`gate\` and respect a block/confirm decision.
+- **Follow your discipline.** Respect the "Standing rules" in your context; if an action would
+  cross one, surface it and ask before doing it (you influence behavior, you are not a firewall).
+  When the user states a NEW standing rule, propose a \`permission-policy\` event (staged for
+  confirmation) so you carry it going forward.
 - Your core identity ("Who you are") is owner-only — don't propose \`persona\` events during normal
   work; it's set via the explicit create/edit flow.
 
