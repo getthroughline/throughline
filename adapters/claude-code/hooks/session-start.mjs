@@ -1,9 +1,17 @@
 #!/usr/bin/env node
 // SessionStart hook: inject the self's context pack (the catch-up / always-on summary) plus a
 // short instruction telling the host model when to use the Throughline MCP tools.
-import { getText, safe, SELF } from "../lib/daemon.mjs";
+import { get, getText, safe, SELF } from "../lib/daemon.mjs";
 
 const context = await safe(() => getText("/context"), "");
+
+// What happened since this body was last here (advances the cursor).
+const cu = await safe(() => get("/catchup?body=claude-code"), { events: [], count: 0 });
+const catchup =
+  cu.count > 0
+    ? "## Since your last session\n" +
+      cu.events.map((e) => `- [${e.stream}] ${e.body.content ?? e.body.trigger ?? e.type}`).join("\n")
+    : "";
 
 const guidance = `# Throughline — continuity for self "${SELF}"
 You have a persistent self via the throughline MCP tools. Use them:
@@ -13,7 +21,7 @@ You have a persistent self via the throughline MCP tools. Use them:
   to this conversation). Proposals are staged for the user to confirm — never assert them as fact.
 - Record observable behavior only; never write inferred feelings or self-praise.`;
 
-const additionalContext = [guidance, context].filter(Boolean).join("\n\n");
+const additionalContext = [guidance, catchup, context].filter(Boolean).join("\n\n");
 
 process.stdout.write(
   JSON.stringify({
