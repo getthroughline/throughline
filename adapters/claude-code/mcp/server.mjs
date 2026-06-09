@@ -2,9 +2,17 @@
 // Minimal MCP stdio server (JSON-RPC 2.0, newline-delimited), no SDK / no deps.
 // Exposes the local throughlined API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
-import { get, post, rawGet, rawPost } from "../lib/daemon.mjs";
+import { get, getText, post, rawGet, rawPost } from "../lib/daemon.mjs";
 
 const TOOLS = [
+  {
+    name: "whoami",
+    description:
+      "Load this self: who you are (adopt the identity/voice), your standing context, and what " +
+      "changed since last time. In hosts without automatic injection, call this at the start of a " +
+      "session before answering.",
+    inputSchema: { type: "object", properties: {} },
+  },
   {
     name: "recall",
     description: "Search this self's past events (judgments, corrections, risks, shared history).",
@@ -125,6 +133,13 @@ const TOOLS = [
 
 async function callTool(name, args) {
   switch (name) {
+    case "whoami": {
+      const [context, cu] = await Promise.all([
+        getText("/context").catch(() => ""),
+        get("/catchup?body=mcp").catch(() => ({ events: [], count: 0 })),
+      ]);
+      return { context, since_last_session: cu.events ?? [] };
+    }
     case "recall": {
       const params = new URLSearchParams({ q: args.query ?? "", k: String(args.k ?? 8) });
       if (args.stream) params.set("stream", args.stream);

@@ -86,6 +86,11 @@ interviews you (who it should be, who you are, your relationship), drafts its pe
 it once you approve. Switch anytime with `throughline self use <name>` (or just ask it to switch).
 With the cloud this becomes a guided form on the web.
 
+### Other hosts (BYO body)
+
+The tools are a standard MCP server, so Claude Desktop / Cursor / Codex can connect to the **same
+self** — see **[MCP.md](MCP.md)**. (ChatGPT connects via the cloud, coming soon.)
+
 Check anything with `throughline status`. Full walkthrough and uninstall: **[INSTALL.md](INSTALL.md)**.
 See it working in 2 minutes: **[DEMO.md](DEMO.md)**.
 
