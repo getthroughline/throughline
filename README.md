@@ -52,7 +52,7 @@ YOURS             verifiable export · archive · provenance · the format (spec
 
 ```
 1. Sign in at the Throughline cloud dashboard → copy your API key
-2. /plugin marketplace add nianliu-tech/throughline     (run alone)
+2. /plugin marketplace add getthroughline/throughline     (run alone)
 3. /plugin install throughline                          (run alone)
 4. restart Claude Code, then:  /throughline:key <YOUR_KEY>
 5. /throughline:create <name> — she interviews you; you approve who she becomes
@@ -82,14 +82,14 @@ Early. Building the foundation in this order:
 Requires Node 24+. Install, sign in, register the plugin in Claude Code:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/nianliu-tech/throughline/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/getthroughline/throughline/main/install.sh | sh
 throughline login
 ```
 
 Then, inside Claude Code (restart it afterward):
 
 ```
-/plugin marketplace add nianliu-tech/throughline
+/plugin marketplace add getthroughline/throughline
 /plugin install throughline@throughline
 ```
 

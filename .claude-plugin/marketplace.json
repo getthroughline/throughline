@@ -1,7 +1,7 @@
 {
   "name": "throughline",
   "owner": {
-    "name": "nianliu-tech"
+    "name": "getthroughline"
   },
   "metadata": {
     "description": "Throughline — a persistent, user-owned AI self (persona + memory + rules) you carry across hosts.",

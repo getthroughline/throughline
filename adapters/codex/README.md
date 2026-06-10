@@ -17,7 +17,7 @@ experience is close to Claude Code's.
 ## Install
 
 ```sh
-codex plugin marketplace add nianliu-tech/throughline
+codex plugin marketplace add getthroughline/throughline
 codex plugin install throughline
 ```
 
