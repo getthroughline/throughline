@@ -31,18 +31,43 @@ function authHeaders(extra = {}) {
   };
 }
 
-// Which self this session maps to: THROUGHLINE_SELF -> the API's default_self -> "assistant".
-let cachedSelf;
+// Which self this session maps to, in priority order:
+//   1. THROUGHLINE_SELF env (explicit pin)
+//   2. a `.throughline` file in the project (cwd, walking up) — per-project session isolation:
+//      the work repo stays the work self, everywhere else stays the default
+//   3. the account's default_self
+// `selfSource()` reports which rule won, so the session hook can tell the user.
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+let cachedSelf, cachedSource;
+function projectSelf() {
+  let dir = process.cwd();
+  for (let i = 0; i < 12; i++) {
+    const f = resolve(dir, ".throughline");
+    if (existsSync(f)) {
+      const name = readFileSync(f, "utf8").trim().split("\n")[0].trim();
+      if (name) return name;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+export function selfSource() { return cachedSource ?? "default"; }
 export async function self() {
   if (cachedSelf) return cachedSelf;
-  if (process.env.THROUGHLINE_SELF) return (cachedSelf = process.env.THROUGHLINE_SELF);
+  if (process.env.THROUGHLINE_SELF) { cachedSource = "env"; return (cachedSelf = process.env.THROUGHLINE_SELF); }
+  const proj = projectSelf();
+  if (proj) { cachedSource = "project"; return (cachedSelf = proj); }
   try {
     const res = await fetch(`${BASE}/config`, { headers: authHeaders() });
     if (res.ok) {
       const cfg = await res.json();
-      if (cfg.default_self) return (cachedSelf = cfg.default_self);
+      if (cfg.default_self) { cachedSource = "account-default"; return (cachedSelf = cfg.default_self); }
     }
   } catch { /* unreachable — fall through */ }
+  cachedSource = "fallback";
   return (cachedSelf = "assistant");
 }
 

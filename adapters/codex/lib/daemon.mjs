@@ -26,17 +26,39 @@ function authHeaders() {
   };
 }
 
-let cachedSelf;
+// Self resolution: THROUGHLINE_SELF env -> `.throughline` project file (cwd, walking up;
+// per-project session isolation) -> account default. selfSource() reports which rule won.
+import { existsSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+let cachedSelf, cachedSource;
+function projectSelf() {
+  let dir = process.cwd();
+  for (let i = 0; i < 12; i++) {
+    const f = resolve(dir, ".throughline");
+    if (existsSync(f)) {
+      const name = readFileSync(f, "utf8").trim().split("\n")[0].trim();
+      if (name) return name;
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+export function selfSource() { return cachedSource ?? "default"; }
 export async function self() {
   if (cachedSelf) return cachedSelf;
-  if (process.env.THROUGHLINE_SELF) return (cachedSelf = process.env.THROUGHLINE_SELF);
+  if (process.env.THROUGHLINE_SELF) { cachedSource = "env"; return (cachedSelf = process.env.THROUGHLINE_SELF); }
+  const proj = projectSelf();
+  if (proj) { cachedSource = "project"; return (cachedSelf = proj); }
   try {
     const res = await fetch(`${BASE}/config`, { headers: authHeaders() });
     if (res.ok) {
       const cfg = await res.json();
-      if (cfg.default_self) return (cachedSelf = cfg.default_self);
+      if (cfg.default_self) { cachedSource = "account-default"; return (cachedSelf = cfg.default_self); }
     }
   } catch { /* fall through */ }
+  cachedSource = "fallback";
   return (cachedSelf = "assistant");
 }
 

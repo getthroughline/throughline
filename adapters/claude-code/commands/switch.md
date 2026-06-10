@@ -1,8 +1,17 @@
 ---
-description: Switch your active Throughline self
-argument-hint: <self name>
+description: Switch your Throughline self — for this project only, or everywhere
+argument-hint: <self name> [here|everywhere]
 ---
 
-Switch my active self to "$ARGUMENTS" by calling the `use_self` tool. If no name was given, call
-`list_selves` first and ask me which one. Confirm the switch, and remind me it applies to new
-sessions.
+Switch my self to "$ARGUMENTS".
+
+First call `list_selves` to verify the name exists (if no name was given, show the list and ask).
+Then ask me ONE question if I didn't already say: **"just this project, or everywhere?"**
+
+- **This project** → write the self's name as the only line of a `.throughline` file in the
+  project root (create or overwrite it). That binds THIS directory to that self — other projects
+  and hosts are untouched. Takes effect next session.
+- **Everywhere** → call `use_self` (changes the account default for every host that hasn't pinned
+  one). Takes effect in new sessions.
+
+Confirm what you did in one line, including when it takes effect.

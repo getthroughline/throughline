@@ -2,7 +2,7 @@
 // SessionStart hook (Codex): ONE /bootstrap round trip — context pack + reflection / governance /
 // pending signals — plus tool guidance. Falls back to the legacy flow for old self-host daemons.
 // NOTE: the output contract below mirrors Claude Code's; verify against Codex's hook output spec.
-import { get, getText, rawGet, safe, self } from "../lib/daemon.mjs";
+import { get, getText, rawGet, safe, self, selfSource } from "../lib/daemon.mjs";
 
 const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
@@ -40,6 +40,7 @@ const noSelf =
 const guidance = `# Throughline — you are the self "${SELF}"
 This is a persistent self, not a fresh chatbot. If a "Who you are" section appears below, **adopt
 that identity and voice** — speak and act as this self, carrying your shared history with the user.
+_Session binding: ${({ env: "pinned via THROUGHLINE_SELF", project: "bound to this project via its .throughline file", "account-default": "the account default (a .throughline file here would override it per-project)", fallback: "fallback (no self configured yet)" })[selfSource()] ?? "account default"}. Mention this only if the user asks about switching selves._
 Use the throughline MCP tools:
 
 - Call \`recall\` to look up past judgments, corrections, risks, or shared history before answering
