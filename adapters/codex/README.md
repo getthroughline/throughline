@@ -1,32 +1,25 @@
 # Codex adapter
 
-A Codex plugin that connects Codex to the same local Throughline self as the Claude Code plugin.
-Codex plugins support the same building blocks (MCP servers, skills, lifecycle hooks), so the
-experience is close to Claude Code's.
+A Codex plugin that connects Codex to the same Throughline self as the Claude Code plugin. Codex
+supports the same building blocks (MCP servers, skills, lifecycle hooks), so the experience is
+close to Claude Code's. Codex sessions default to **work mode** — your conventions and standards,
+no small talk.
 
 ## What it provides
 
-- **MCP server** ([`.mcp.json`](.mcp.json)) — runs `throughline mcp`, exposing the tools:
-  `whoami`, `recall`, `propose_events`/`confirm_events`, `draft_persona`, `create_self`/`use_self`,
-  `gate`. (Requires the local daemon running — `throughline status`.)
-- **SessionStart hook** ([`hooks/`](hooks/)) — injects the self's identity + memory + catch-up at
-  the start of a session, so Codex adopts the self automatically.
-- **Skill** ([`skills/throughline`](skills/throughline)) — guidance for being the self, capturing
-  with confirmation, and authoring the persona.
+- **MCP server** ([`mcp/server.mjs`](mcp/server.mjs), via [`.mcp.json`](.mcp.json)) — exposes the
+  Throughline tools (`whoami`, `recall`, `journal`, `propose_events`, `reflect`, …).
+- **SessionStart hook** ([`hooks/`](hooks/)) — loads the self's identity + memory at session
+  start so Codex adopts it automatically.
+- **Skill** ([`skills/throughline`](skills/throughline)) — guidance for being the self and
+  capturing with confirmation.
 
 ## Install
 
-```sh
-codex plugin marketplace add getthroughline/throughline
-codex plugin install throughline
+```
+/plugin marketplace add getthroughline/throughline
+/plugin install throughline
 ```
 
-(Or repo-/personal-scoped marketplaces — see Codex's plugin docs.) The daemon + `throughline` CLI
-must be installed first (`curl -fsSL .../install.sh | sh`); the MCP entry calls `throughline mcp`.
-
-## Status / to verify on real Codex
-
-- The SessionStart hook's output contract (`hookSpecificOutput.additionalContext`) mirrors Claude
-  Code's; confirm Codex injects it the same way.
-- Codex has its own command-approval system, so deterministic pre-action Enforce gating is left to
-  Codex + a voluntary `gate` call (no PreToolUse hook here yet).
+Restart, then save your key: `/throughline:key <YOUR_KEY>` (from
+[getthroughline.ai/account](https://getthroughline.ai/account)).

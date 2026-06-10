@@ -1,5 +1,5 @@
 // Thin client for the Throughline API. Cloud-first: talks to the cloud by default; point
-// THROUGHLINE_URL at a local daemon (http://127.0.0.1:8787) to self-host.
+// THROUGHLINE_URL to point at a self-hosted backend.
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -8,7 +8,7 @@ const CLOUD = "https://getthroughline.ai";
 const BASE = process.env.THROUGHLINE_URL ?? CLOUD;
 
 // API key: env (e.g. set in the MCP server config) -> ~/.throughline/auth.json (saved by
-// `throughline use-key`). Sent as a Bearer. A local self-host daemon ignores it.
+// the dashboard). Sent as a Bearer token.
 function apiKey() {
   if (process.env.THROUGHLINE_API_KEY) return process.env.THROUGHLINE_API_KEY;
   try {

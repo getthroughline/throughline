@@ -1,138 +1,49 @@
 # Throughline
 
-**Own the self. BYO body.**
+**Own the self. Bring your own body.**
 
-A model is a brain, not a keeper. It is stateless: it thinks in the moment, then forgets.
-Throughline is the **continuity layer you own** — a portable, grounded, anti-drift, compounding
-record of who your agent is and how it has judged, related, and changed over time.
+Throughline gives your AI a persistent self — one personality, one memory, one shared history —
+that lives in **your** account and follows you across every app and model. Apps change, models
+upgrade, years pass; it's still itself, and it still remembers.
 
-It is not a memory store and not an agent platform. It is the *throughline* of a self that
-persists across sessions and across hosts. Plug it into Claude Code today, OpenClaw / Codex /
-Cursor tomorrow — the body changes, the self stays yours.
+→ **[getthroughline.ai](https://getthroughline.ai)**
 
-> Models forget, drift, and restart. Throughline keeps the relationship and the judgment from
-> going back to zero.
+This repository is the open client: the Claude Code and Codex plugins that connect your editor
+to your Throughline self.
 
-## Why this exists
+## Install (Claude Code)
 
-The valuable, defensible thing about a long-running agent is not its memory of facts (every
-provider gives that away for free now) and not its persona definition (anyone can copy a
-prompt). It is the **accumulated, time-stamped, outcome-linked history** of how *this* agent
-judged *you*, related to *you*, and corrected itself — a private record that cannot be
-fabricated after the fact and gets more valuable the longer it runs.
-
-No single model provider will give you that in a portable, you-own-it form, because portability
-is against their interest. That is the gap Throughline fills.
-
-## Core principles
-
-- **You own it, and you can always leave.** Open format, full one-command export, no lock-in.
-  The moat is *guaranteed exit*, not encryption.
-- **Append-only, evidence-grounded.** Every row is an immutable event that must point to where
-  it came from. You never rewrite history; you supersede it.
-- **Anti-drift by construction.** No fabricated memories, no sycophancy. The self evolves toward
-  *knowing you*, not toward *pleasing you*.
-- **Cloud-first, self-host optional.** The default setup is a plugin + an API key — no daemon,
-  no CLI, nothing to keep running. The open local daemon exists for one reason: zero-knowledge
-  self-hosting. It's the trust anchor, not the on-ramp.
-
-## Architecture at a glance
-
-```
-BODY (any host)   Claude Code | Codex | Cursor | ChatGPT
-   thin adapter: hooks + MCP (this repo)
-─────────────────────────────────────────────────────────
-THE SELF          Throughline cloud (default)  ·  or throughlined, self-hosted (this repo)
-   event store · projections · recall · capture · discipline · reflection
-─────────────────────────────────────────────────────────
-YOURS             verifiable export · archive · provenance · the format (spec v1)
-```
-
-## Quickstart (no daemon, no CLI)
-
-```
-1. Sign in at the Throughline cloud dashboard → copy your API key
-2. /plugin marketplace add getthroughline/throughline     (run alone)
-3. /plugin install throughline                          (run alone)
-4. restart Claude Code, then:  /throughline:key <YOUR_KEY>
-5. /throughline:create <name> — she interviews you; you approve who she becomes
-```
-
-Self-hosting the open daemon (zero-knowledge): see [INSTALL.md](INSTALL.md#self-hosting-advanced).
-
-The **event log is the source of truth**; everything else (the current self-context, the active
-rules, the salience index) is a projection rebuilt from it. See
-[ARCHITECTURE.md](ARCHITECTURE.md) and the event schema in [spec/EVENTS.md](spec/EVENTS.md).
-
-This repository is the **open-source local layer**. The cloud backend and web app live in a
-separate private repository — the open/closed boundary is the business boundary.
-
-## Status
-
-Early. Building the foundation in this order:
-
-1. **Local runtime** — event store + projections + local API *(in progress, see [`daemon/`](daemon/))*
-2. Capture engine (turn conversations into grounded candidate events)
-3. Cloud Sync + Export (portability, durability)
-4. Cloud Heartbeat + channels (always-on, proactive)
-5. Account / billing / dashboard (web)
-
-## Install (into Claude Code)
-
-Requires Node 24+. Install, sign in, register the plugin in Claude Code:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/getthroughline/throughline/main/install.sh | sh
-throughline login
-```
-
-Then, inside Claude Code (restart it afterward):
+Run each line as its own command:
 
 ```
 /plugin marketplace add getthroughline/throughline
-/plugin install throughline@throughline
+/plugin install throughline
 ```
 
-**Create your self right in Claude Code** — just say *"set up a self"* and the assistant
-interviews you (who it should be, who you are, your relationship), drafts its persona, and saves
-it once you approve. Switch anytime with `throughline self use <name>` (or just ask it to switch).
-With the cloud this becomes a guided form on the web.
+Restart Claude Code, then save your API key (from your dashboard at
+[getthroughline.ai/account](https://getthroughline.ai/account)):
 
-### Other hosts (BYO body)
-
-The tools are a standard MCP server, so Claude Desktop / Cursor / Codex can connect to the **same
-self** — see **[MCP.md](MCP.md)**. (ChatGPT connects via the cloud, coming soon.)
-
-Check anything with `throughline status`. Full walkthrough and uninstall: **[INSTALL.md](INSTALL.md)**.
-See it working in 2 minutes: **[DEMO.md](DEMO.md)**.
-
-The CLI is the control/setup surface; the actual value is ambient — it works inside Claude Code
-automatically, and (with the cloud) reaches you proactively. You don't run commands to use it.
-
-### Want plain assistant for a bit?
-
-```sh
-throughline pause     # neutral mode: new sessions act as plain Claude — no persona, no Enforce
-throughline resume    # bring your self back (or `throughline resume <name>` to switch)
+```
+/throughline:key <YOUR_KEY>
 ```
 
-Or turn Throughline off entirely with Claude Code's `/plugin disable throughline`.
+Start a new session and create your self:
 
-### Dev
-
-```sh
-cd daemon
-npm start          # = throughline daemon — serves the local API on 127.0.0.1:8787
-npm run smoke      # store + enforce + capture + selves tests
+```
+/throughline:create <name>
 ```
 
-## Domain packs
+It interviews you, drafts who the self is, and saves nothing without your approval.
 
-The `templates/` directory holds seed "selves" / domain packs — the opinionated starting
-content for a new self (an investment-discipline pack, a companion pack, a coding pack). The
-runtime is general; the value and the defensibility live in the packs and in the history you
-accumulate on top of them.
+## Commands
 
-## License
+`/throughline:create` · `:switch` · `:selves` · `:journal` · `:recall` · `:remember` ·
+`:reflect` · `:persona` · `:pause` · `:resume` · `:key` · `:forget`
 
-[MIT](LICENSE) for now (open layer). Subject to change before 1.0.
+## Codex
+
+Add the same marketplace and install `throughline`, restart, then `/throughline:key <YOUR_KEY>`.
+
+---
+
+© Throughline · [Terms](https://getthroughline.ai/terms) · [Privacy](https://getthroughline.ai/privacy)

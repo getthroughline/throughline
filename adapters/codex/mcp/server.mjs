@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Minimal MCP stdio server (JSON-RPC 2.0, newline-delimited), no SDK / no deps.
-// Exposes the local throughlined API to the host model as tools. The host model is the
+// Exposes the Throughline API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
 import { get, getText, post, rawDelete, rawGet, rawPost, self } from "../lib/daemon.mjs";
 
@@ -134,7 +134,7 @@ const TOOLS = [
   },
   {
     name: "pause",
-    description: "Neutral mode — act as plain Claude (no persona, no Enforce). Only when the user asks. Takes effect in new sessions.",
+    description: "Neutral mode — act as plain Claude (no persona, no rules). Only when the user asks. Takes effect in new sessions.",
     inputSchema: { type: "object", properties: {} },
   },
   {

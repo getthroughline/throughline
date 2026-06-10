@@ -1,5 +1,5 @@
 ---
-description: Pause Throughline — act as plain Claude (no persona, no Enforce) for now
+description: Pause Throughline — act as plain Claude (no persona, no rules) for now
 ---
 
 Call the `pause` tool. Then tell me we're in neutral mode (new sessions act as plain Claude) and
