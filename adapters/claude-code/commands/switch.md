@@ -14,4 +14,6 @@ Then ask me ONE question if I didn't already say: **"just this project, or every
 - **Everywhere** → call `use_self` (changes the account default for every host that hasn't pinned
   one). Takes effect in new sessions.
 
-Confirm what you did in one line, including when it takes effect.
+Confirm what you did in one line. Then **tell me clearly: the change takes effect in a new
+session — I need to start a fresh Claude Code session (or run /reload-plugins) for the switch to
+load.** The currently running session keeps the self it started with.
