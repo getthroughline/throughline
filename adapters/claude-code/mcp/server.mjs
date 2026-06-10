@@ -2,7 +2,7 @@
 // Minimal MCP stdio server (JSON-RPC 2.0, newline-delimited), no SDK / no deps.
 // Exposes the local throughlined API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
-import { get, getText, post, rawDelete, rawGet, rawPost } from "../lib/daemon.mjs";
+import { get, getText, post, rawDelete, rawGet, rawPost, self } from "../lib/daemon.mjs";
 
 const TOOLS = [
   {
@@ -22,6 +22,8 @@ const TOOLS = [
         query: { type: "string" },
         k: { type: "number", description: "max results (default 8)" },
         stream: { type: "string", description: "optional: restrict to one stream" },
+        since: { type: "string", description: "optional ISO timestamp — bound recall to a period" },
+        until: { type: "string", description: "optional ISO timestamp" },
       },
       required: ["query"],
     },
@@ -54,6 +56,18 @@ const TOOLS = [
     },
   },
   { name: "pending", description: "List candidate events staged for confirmation.", inputSchema: { type: "object", properties: {} } },
+  {
+    name: "journal",
+    description:
+      "Low-friction prose capture: drop a diary-style note into the log (no schema, no evidence " +
+      "ceremony). Raw material that reflection later distills into structured memory.",
+    inputSchema: { type: "object", properties: { content: { type: "string" } }, required: ["content"] },
+  },
+  {
+    name: "retract_event",
+    description: "Delete a wrongly captured memory by id (the undo for auto-saved events).",
+    inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
+  },
   {
     name: "confirm_events",
     description:
@@ -152,6 +166,8 @@ const TOOLS = [
 async function callTool(name, args) {
   switch (name) {
     case "whoami": {
+      const bs = await rawGet(`/selves/${encodeURIComponent(await self())}/bootstrap`).catch(() => null);
+      if (bs) return { paused: bs.paused, context: bs.context, reflection: bs.reflection, governance: bs.governance, pending: bs.pending };
       const [context, cu] = await Promise.all([
         getText("/context").catch(() => ""),
         get("/catchup?body=mcp").catch(() => ({ events: [], count: 0 })),
@@ -161,10 +177,16 @@ async function callTool(name, args) {
     case "recall": {
       const params = new URLSearchParams({ q: args.query ?? "", k: String(args.k ?? 8) });
       if (args.stream) params.set("stream", args.stream);
+      if (args.since) params.set("since", args.since);
+      if (args.until) params.set("until", args.until);
       return get(`/recall?${params}`);
     }
     case "propose_events":
       return post("/capture/propose", { events: args.events ?? [], source: "claude-code" });
+    case "journal":
+      return post("/journal", { content: args.content ?? "" });
+    case "retract_event":
+      return post("/capture/retract", { id: args.id ?? "" });
     case "pending":
       return get("/capture/pending");
     case "confirm_events": {

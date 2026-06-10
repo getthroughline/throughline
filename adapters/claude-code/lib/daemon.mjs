@@ -17,9 +17,18 @@ function apiKey() {
     return null;
   }
 }
+// Writer provenance: which host/model is writing. Powers the cloud's conformance telemetry
+// and the fidelity gate (weak substrates lose auto-save). Override via env if embedding elsewhere.
+const SOURCE = process.env.THROUGHLINE_SOURCE ?? "claude-code-plugin";
+const MODEL = process.env.THROUGHLINE_MODEL ?? process.env.ANTHROPIC_MODEL ?? "";
 function authHeaders(extra = {}) {
   const key = apiKey();
-  return key ? { authorization: `Bearer ${key}`, ...extra } : extra;
+  return {
+    "x-throughline-source": SOURCE,
+    ...(MODEL ? { "x-throughline-model": MODEL } : {}),
+    ...(key ? { authorization: `Bearer ${key}` } : {}),
+    ...extra,
+  };
 }
 
 // Which self this session maps to: THROUGHLINE_SELF -> the API's default_self -> "assistant".

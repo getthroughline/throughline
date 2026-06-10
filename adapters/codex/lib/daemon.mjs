@@ -15,9 +15,15 @@ function apiKey() {
     return null;
   }
 }
+const SOURCE = process.env.THROUGHLINE_SOURCE ?? "codex-plugin";
+const MODEL = process.env.THROUGHLINE_MODEL ?? "";
 function authHeaders() {
   const key = apiKey();
-  return key ? { authorization: `Bearer ${key}` } : {};
+  return {
+    "x-throughline-source": SOURCE,
+    ...(MODEL ? { "x-throughline-model": MODEL } : {}),
+    ...(key ? { authorization: `Bearer ${key}` } : {}),
+  };
 }
 
 let cachedSelf;

@@ -1,33 +1,49 @@
 #!/usr/bin/env node
-// SessionStart hook (Codex): inject the self's context pack + tool guidance.
+// SessionStart hook (Codex): ONE /bootstrap round trip — context pack + reflection / governance /
+// pending signals — plus tool guidance. Falls back to the legacy flow for old self-host daemons.
 // NOTE: the output contract below mirrors Claude Code's; verify against Codex's hook output spec.
 import { get, getText, rawGet, safe, self } from "../lib/daemon.mjs";
 
-// Paused (neutral mode): inject nothing.
-const cfg = await safe(() => rawGet("/config"), {});
-if (cfg.paused) {
-  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: "" } }));
-  process.exit(0);
-}
+const emit = (additionalContext) => {
+  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
+};
 
 const SELF = await safe(() => self(), "assistant");
-const context = await safe(() => getText("/context"), "");
-const selves = (await safe(() => rawGet("/selves"), { selves: [] })).selves ?? [];
-const noSelf = selves.length === 0;
+const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap`), null);
 
-const cu = await safe(() => get("/catchup?body=codex"), { events: [], count: 0 });
-const catchup =
-  cu.count > 0
-    ? "## Since your last session\n" +
-      cu.events.map((e) => `- [${e.stream}] ${e.body.content ?? e.body.trigger ?? e.type}`).join("\n")
-    : "";
+let paused, context;
+const signals = [];
+if (bs) {
+  paused = !!bs.paused;
+  context = bs.context ?? "";
+  if (bs.reflection?.due)
+    signals.push(`## Reflection due\n${bs.reflection.newCount} raw memories accrued — call \`reflect\`, distill with the user, then \`complete_reflection\`.`);
+  if (bs.governance?.due)
+    signals.push("## Rule consolidation due\nMerge same-direction rules via `supersedes`; classify genuine contradictions as `tension`. Rules must distill, not accumulate.");
+  if (bs.pending > 0)
+    signals.push(`_(${bs.pending} staged candidate${bs.pending > 1 ? "s" : ""} awaiting confirmation.)_`);
+} else {
+  const cfg = await safe(() => rawGet("/config"), {});
+  paused = !!cfg.paused;
+  context = paused ? "" : await safe(() => getText("/context"), "");
+  const cu = paused ? { count: 0, events: [] } : await safe(() => get("/catchup?body=codex"), { events: [], count: 0 });
+  if (cu.count > 0)
+    signals.push("## Since your last session\n" + cu.events.map((e) => `- [${e.stream}] ${e.body.content ?? e.body.trigger ?? e.type}`).join("\n"));
+}
+
+if (paused) { emit(""); process.exit(0); }
+
+const noSelf =
+  (context ?? "").trim().length < 60 &&
+  ((await safe(() => rawGet("/selves"), { selves: [] })).selves ?? []).length === 0;
 
 const guidance = `# Throughline — you are the self "${SELF}"
 This is a persistent self, not a fresh chatbot. If a "Who you are" section appears below, **adopt
 that identity and voice** — speak and act as this self, carrying your shared history with the user.
 Use the throughline MCP tools:
 
-- Call \`recall\` to look up past judgments, corrections, risks, or shared history before answering.
+- Call \`recall\` to look up past judgments, corrections, risks, or shared history before answering
+  (it takes \`since\`/\`until\`). Before claiming you don't remember, recall first.
 - Record observable behavior only; never write inferred feelings or self-praise. Every row needs
   evidence pointing to this conversation.
 - When the user corrects your tone/voice that's a \`persona-ledger\` event; a thing you did
@@ -43,13 +59,11 @@ Use the throughline MCP tools:
 Create: \`create_self\` -> interview -> \`draft_persona\` (slots soul/identity/user) -> show ->
 \`confirm_events\` after approval. Switch: \`use_self\`. List: \`list_selves\`.${noSelf ? "\n\n## First run\nThere is no self yet. Greet the user and offer to set one up (create_self -> interview -> draft_persona -> confirm)." : ""}
 
-## Capturing (human-in-the-loop)
-On a real decision/correction/boundary/shared moment: \`propose_events\` (staged), show the user a
-one-line summary, and only call \`confirm_events\` after they approve. \`reject_events\` if declined.
-Never confirm without explicit approval.`;
+## Capturing (tiered — follow exactly)
+On a real decision/correction/boundary/shared moment, call \`propose_events\`:
+observational memories **save immediately** (retractable via \`retract_event\` — mention what you
+saved); behavior-shaping rows (rules, tone, stances, risks) come back **staged** — show a one-line
+summary and \`confirm_events\` ONLY after explicit approval (\`reject_events\` if declined).
+Loose prose goes to \`journal\` — no schema; reflection distills it later.`;
 
-const additionalContext = [guidance, catchup, context].filter(Boolean).join("\n\n");
-
-process.stdout.write(
-  JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }),
-);
+emit([guidance, ...signals, context].filter(Boolean).join("\n\n"));
