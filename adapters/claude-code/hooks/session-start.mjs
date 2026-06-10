@@ -10,7 +10,7 @@ const emit = (additionalContext) => {
 
 // Installed but not connected: turn the dead end into directions.
 if (!hasKey() && !process.env.THROUGHLINE_URL) {
-  emit("# Throughline is installed but not connected\nIf the user asks about Throughline (or you see this at session start), tell them: sign in at https://getthroughline.ai → Key & data → copy the one-paste command, then run `/throughline:key <KEY>` here and start a new session. Until then, behave normally — no self is loaded.");
+  emit("# Throughline is installed but not connected\nIf the user asks about Throughline (or you see this at session start), tell them: sign in at https://getthroughline.ai/account → copy the one-paste setup command, then run `/throughline:key <KEY>` here and start a new session. Until then, behave normally — no self is loaded.");
   process.exit(0);
 }
 
