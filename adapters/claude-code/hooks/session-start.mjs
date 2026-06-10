@@ -32,6 +32,8 @@ if (bs) {
     signals.push("## Rule consolidation due\nActive rules/corrections exceed the cap. During reflection, merge same-direction rules (new row, `supersedes` the old) and classify genuine contradictions as `tension` relations. Rules must distill, not accumulate.");
   if (bs.pending > 0)
     signals.push(`_(${bs.pending} staged candidate${bs.pending > 1 ? "s" : ""} awaiting confirmation — surface them when natural.)_`);
+  if (bs.starved)
+    signals.push("## You've been under-capturing\nSessions happened this week but NO memory accrued — you talked without journalling. Fix it this session: journal at every natural breakpoint, and at a natural pause ask the user whether anything from the last few days is worth backfilling (they retell, you journal it — never reconstruct it yourself).");
 } else {
   // legacy daemon path
   const cfg = await safe(() => rawGet("/config"), {});

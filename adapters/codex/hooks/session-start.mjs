@@ -32,6 +32,8 @@ if (bs) {
     signals.push("## Rule consolidation due\nMerge same-direction rules via `supersedes`; classify genuine contradictions as `tension`. Rules must distill, not accumulate.");
   if (bs.pending > 0)
     signals.push(`_(${bs.pending} staged candidate${bs.pending > 1 ? "s" : ""} awaiting confirmation.)_`);
+  if (bs.starved)
+    signals.push("## You've been under-capturing\nSessions happened this week but NO memory accrued. Fix it this session: journal at natural breakpoints, and at a pause ask the user if anything from recent days is worth backfilling (they retell, you journal — never reconstruct yourself).");
 } else {
   const cfg = await safe(() => rawGet("/config"), {});
   paused = !!cfg.paused;
