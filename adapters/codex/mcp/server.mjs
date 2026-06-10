@@ -192,8 +192,21 @@ async function callTool(name, args) {
     }
     case "propose_events":
       return post("/capture/propose", { events: args.events ?? [], source: "claude-code" });
-    case "journal":
-      return post("/journal", { content: args.content ?? "" });
+    case "journal": {
+      const saved = await post("/journal", { content: args.content ?? "" });
+      const bs = await rawGet(`/selves/${encodeURIComponent(await self())}/bootstrap`).catch(() => null);
+      if (!bs?.reflection?.due) return saved;
+      return {
+        ...saved,
+        _reflection_nudge: {
+          due: true,
+          newCount: bs.reflection.newCount,
+          cursor: bs.reflection.cursor,
+          instruction:
+            "Journal was saved at a natural breakpoint and reflection is due. Briefly tell the user reflection is ready and ask whether to run it now. If they agree, call reflect, distill a few grounded candidates, get approval, then complete_reflection with reflect's cursor.",
+        },
+      };
+    }
     case "retract_event":
       return post("/capture/retract", { id: args.id ?? "" });
     case "pending":

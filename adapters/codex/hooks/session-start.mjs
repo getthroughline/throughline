@@ -27,7 +27,7 @@ if (bs) {
   paused = !!bs.paused;
   context = bs.context ?? "";
   if (bs.reflection?.due)
-    signals.push(`## Reflection due\n${bs.reflection.newCount} raw memories accrued — call \`reflect\`, distill with the user, then \`complete_reflection\`.`);
+    signals.push(`## Reflection queued\n${bs.reflection.newCount} raw memories accrued. Do not interrupt the user's current work; at a natural pause call \`reflect\`, distill with the user, then \`complete_reflection\`.`);
   if (bs.governance?.due)
     signals.push("## Rule consolidation due\nMerge same-direction rules via `supersedes`; classify genuine contradictions as `tension`. Rules must distill, not accumulate.");
   if (bs.pending > 0)
