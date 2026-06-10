@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const CLOUD = "https://throughline-cloud-production.up.railway.app";
+const CLOUD = "https://getthroughline.ai";
 const BASE = process.env.THROUGHLINE_URL ?? CLOUD;
 
 function apiKey() {
