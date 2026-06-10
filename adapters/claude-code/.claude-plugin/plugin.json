@@ -1,7 +1,7 @@
 {
   "name": "throughline",
-  "version": "0.6.4",
-  "description": "Throughline continuity for Claude Code: self-context injection, tiered capture, journal, recall. Cloud-first; self-host optional.",
+  "version": "0.7.0",
+  "description": "Throughline continuity for Claude Code: self-context injection, deterministic write-back, tiered capture, journal, recall. Cloud-first; self-host optional.",
   "mcpServers": {
     "throughline": {
       "command": "node",
