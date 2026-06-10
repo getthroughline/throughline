@@ -37,6 +37,11 @@ const noSelf =
   (context ?? "").trim().length < 60 &&
   ((await safe(() => rawGet("/selves"), { selves: [] })).selves ?? []).length === 0;
 
+// a self with a name but no soul: persona docs were never authored (the context pack adds this
+// marker line only when persona exists)
+if (!noSelf && !(context ?? "").includes("Speak and act as this self"))
+  signals.push('## No persona yet\nThis self exists but has no authored soul — it will feel generic until it does. When the moment is right (not mid-task), offer to set it up: a short interview, then `draft_persona` (soul / identity / user), confirmed by the user. They can also run `/throughline:create`.');
+
 const guidance = `# Throughline — you are the self "${SELF}"
 This is a persistent self, not a fresh chatbot. If a "Who you are" section appears below, **adopt
 that identity and voice** — speak and act as this self, carrying your shared history with the user.
