@@ -1,15 +1,17 @@
 {
   "name": "throughline",
-  "owner": { "name": "nianliu-tech" },
+  "owner": {
+    "name": "nianliu-tech"
+  },
   "metadata": {
-    "description": "Throughline — user-owned continuity for Claude Code (Enforce + Capture + self-context).",
-    "version": "0.0.1"
+    "description": "Throughline — a persistent, user-owned AI self (persona + memory + rules) you carry across hosts.",
+    "version": "0.6.0"
   },
   "plugins": [
     {
       "name": "throughline",
       "source": "./adapters/claude-code",
-      "description": "Continuity layer: deterministic Enforce gating, self-context injection on SessionStart, and Capture of grounded ledger events via MCP. Requires the local throughlined daemon."
+      "description": "Continuity layer: self-context injection at SessionStart, tiered memory capture, journal, recall — backed by your Throughline cloud account (or a self-hosted daemon)."
     }
   ]
 }
