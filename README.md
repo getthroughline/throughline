@@ -32,21 +32,33 @@ is against their interest. That is the gap Throughline fills.
   it came from. You never rewrite history; you supersede it.
 - **Anti-drift by construction.** No fabricated memories, no sycophancy. The self evolves toward
   *knowing you*, not toward *pleasing you*.
-- **Local-first, optionally cloud.** Works fully offline on one machine. Sync / always-on /
-  scoring are services you add, not a platform you're trapped in.
+- **Cloud-first, self-host optional.** The default setup is a plugin + an API key — no daemon,
+  no CLI, nothing to keep running. The open local daemon exists for one reason: zero-knowledge
+  self-hosting. It's the trust anchor, not the on-ramp.
 
 ## Architecture at a glance
 
 ```
-BODY (reactive)   Claude Code | OpenClaw | Codex | Cursor
-   thin adapter: hooks + MCP proxy
+BODY (any host)   Claude Code | Codex | Cursor | ChatGPT
+   thin adapter: hooks + MCP (this repo)
 ─────────────────────────────────────────────────────────
-LOCAL RUNTIME     throughlined (this repo, open source)
-   event store · projections · recall · Capture · discipline (in-context)
+THE SELF          Throughline cloud (default)  ·  or throughlined, self-hosted (this repo)
+   event store · projections · recall · capture · discipline · reflection
 ─────────────────────────────────────────────────────────
-CLOUD (optional, separate repo)
-   Sync · Capture · Score · Heartbeat + channels · Export
+YOURS             verifiable export · archive · provenance · the format (spec v1)
 ```
+
+## Quickstart (no daemon, no CLI)
+
+```
+1. Sign in at the Throughline cloud dashboard → copy your API key
+2. /plugin marketplace add nianliu-tech/throughline     (run alone)
+3. /plugin install throughline                          (run alone)
+4. restart Claude Code, then:  /throughline:key <YOUR_KEY>
+5. /throughline:create <name> — she interviews you; you approve who she becomes
+```
+
+Self-hosting the open daemon (zero-knowledge): see [INSTALL.md](INSTALL.md#self-hosting-advanced).
 
 The **event log is the source of truth**; everything else (the current self-context, the active
 rules, the salience index) is a projection rebuilt from it. See
