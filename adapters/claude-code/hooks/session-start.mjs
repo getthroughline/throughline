@@ -2,11 +2,17 @@
 // SessionStart hook: ONE /bootstrap round trip — the context pack plus reflection / governance /
 // pending signals — and the standing instruction for the Throughline MCP tools.
 // Falls back to the legacy multi-call flow for old self-host daemons without /bootstrap.
-import { get, getText, rawGet, safe, self, selfSource, sessionMode } from "../lib/daemon.mjs";
+import { get, getText, rawGet, safe, self, selfSource, sessionMode, hasKey } from "../lib/daemon.mjs";
 
 const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
 };
+
+// Installed but not connected: turn the dead end into directions.
+if (!hasKey() && !process.env.THROUGHLINE_URL) {
+  emit("# Throughline is installed but not connected\nIf the user asks about Throughline (or you see this at session start), tell them: sign in at https://throughline-cloud-production.up.railway.app → Key & data → copy the one-paste command, then run `/throughline:key <KEY>` here and start a new session. Until then, behave normally — no self is loaded.");
+  process.exit(0);
+}
 
 const MODE = sessionMode("full");
 // "off": this project opted out — vanilla agent, no persona, no capture guidance, nothing.

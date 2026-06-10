@@ -46,6 +46,7 @@ function projectSelf() {
   }
   return null;
 }
+export function hasKey() { return !!apiKey(); }
 export function selfSource() { return cachedSource ?? "default"; }
 
 // Mode = persona thickness for this session: "full" | "companion" | "work" | "off".

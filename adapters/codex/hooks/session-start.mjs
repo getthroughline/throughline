@@ -2,13 +2,19 @@
 // SessionStart hook (Codex): ONE /bootstrap round trip — context pack + reflection / governance /
 // pending signals — plus tool guidance. Falls back to the legacy flow for old self-host daemons.
 // NOTE: the output contract below mirrors Claude Code's; verify against Codex's hook output spec.
-import { get, getText, rawGet, safe, self, selfSource, sessionMode } from "../lib/daemon.mjs";
+import { get, getText, rawGet, safe, self, selfSource, sessionMode, hasKey } from "../lib/daemon.mjs";
 
 const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
 };
 
 // Codex is a coding agent: default to WORK mode — spine (rules/corrections/calibration), no voice.
+// Installed but not connected: turn the dead end into directions.
+if (!hasKey() && !process.env.THROUGHLINE_URL) {
+  emit("# Throughline is installed but not connected\nIf the user asks about Throughline (or you see this at session start), tell them: sign in at https://throughline-cloud-production.up.railway.app → Key & data → copy the one-paste command, then run `/throughline:key <KEY>` here and start a new session. Until then, behave normally — no self is loaded.");
+  process.exit(0);
+}
+
 const MODE = sessionMode("work");
 if (MODE === "off") { emit(""); process.exit(0); }
 
