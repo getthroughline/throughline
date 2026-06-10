@@ -28,14 +28,18 @@ function authHeaders() {
 
 // Self resolution: THROUGHLINE_SELF env -> `.throughline` project file (cwd, walking up;
 // per-project session isolation) -> account default. selfSource() reports which rule won.
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 let cachedSelf, cachedSource;
 function projectSelf() {
+  try { return projectSelfUnsafe(); } catch { return null; }
+}
+function projectSelfUnsafe() {
   let dir = process.cwd();
   for (let i = 0; i < 12; i++) {
     const f = resolve(dir, ".throughline");
-    if (existsSync(f)) {
+    // must be a FILE: ~/.throughline (the data directory) shares the name — skip dirs, keep walking
+    if (existsSync(f) && statSync(f).isFile()) {
       const first = readFileSync(f, "utf8").trim().split("\n")[0].trim();
       if (first && first.toLowerCase() !== "off" && !first.toLowerCase().startsWith("mode=")) return first;
       return null; // "off" or mode-only file: no self override here
@@ -55,10 +59,13 @@ export function selfSource() { return cachedSource ?? "default"; }
 // a vanilla agent, no persona, no capture guidance. Presence is a dial, not a default.
 let cachedMode;
 function projectFileLines() {
+  try { return projectFileLinesUnsafe(); } catch { return null; }
+}
+function projectFileLinesUnsafe() {
   let dir = process.cwd();
   for (let i = 0; i < 12; i++) {
     const f = resolve(dir, ".throughline");
-    if (existsSync(f)) return readFileSync(f, "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
+    if (existsSync(f) && statSync(f).isFile()) return readFileSync(f, "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
