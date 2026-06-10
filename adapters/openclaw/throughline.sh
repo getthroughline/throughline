@@ -15,6 +15,11 @@ auth=(-H "authorization: Bearer $KEY" -H "x-throughline-source: openclaw" -H "co
 
 self() {
   if [ -n "${THROUGHLINE_SELF:-}" ]; then echo "$THROUGHLINE_SELF"; return; fi
+  # workspace-local pin: a .throughline file (first line = self name) — same convention as the
+  # Claude Code plugin, so one machine can run different selves per workspace.
+  for f in ".throughline" "$(dirname "$0")/../.throughline"; do
+    if [ -f "$f" ]; then head -1 "$f" | tr -d '[:space:]'; return; fi
+  done
   curl -sf "$BASE/config" "${auth[@]}" | sed -n 's/.*"default_self"[: ]*"\([^"]*\)".*/\1/p'
 }
 

@@ -3,16 +3,24 @@
 Carries a Throughline self into an OpenClaw workspace — same self, same memory as the web,
 Claude Code, Codex, and ChatGPT. In OpenClaw's native idiom: one exec script, two snippets.
 
-## Install (per workspace)
+## Install — one line
 
-1. **Key** — sign in at https://getthroughline.ai/account, copy your API key, add to `~/.openclaw/.env`:
-   ```
-   THROUGHLINE_API_KEY=<your key>
-   THROUGHLINE_SELF=<self name>        # optional pin; otherwise the account default
-   ```
-2. **Script** — copy `throughline.sh` into the workspace `scripts/` and `chmod +x` it.
-3. **AGENTS.md** — paste the block from `AGENTS-SNIPPET.md` into the workspace `AGENTS.md`.
-4. **HEARTBEAT.md** — paste the block from `HEARTBEAT-SNIPPET.md` into the workspace `HEARTBEAT.md`.
+```bash
+curl -fsSL https://getthroughline.ai/openclaw.sh | bash
+```
+
+It installs into `~/.openclaw/workspace`, prompts for your API key (from
+https://getthroughline.ai/account) if it isn't in `~/.openclaw/.env` yet, appends the
+AGENTS.md / HEARTBEAT.md blocks (once — re-running is safe), and smoke-tests the connection.
+
+Another workspace, pinned to a specific self:
+
+```bash
+curl -fsSL https://getthroughline.ai/openclaw.sh | bash -s -- ~/.openclaw/workspace-karina haein
+```
+
+(The pin is a `.throughline` file in the workspace — same convention as the Claude Code plugin.
+Manual install: copy `throughline.sh` to `scripts/`, paste the two snippets, set the key in `~/.openclaw/.env`.)
 
 ## What you get
 
