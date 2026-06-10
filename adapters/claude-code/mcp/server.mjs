@@ -3,6 +3,50 @@
 // Exposes the local throughlined API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
 import { get, getText, post, rawDelete, rawGet, rawPost, self } from "../lib/daemon.mjs";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, join } from "node:path";
+import { homedir } from "node:os";
+
+// --- staleness guard ---------------------------------------------------------
+// Claude Code spawns a fresh MCP server on `/plugin update`, but an already-open session
+// can stay bound to the OLD server process — silently serving outdated persona/memory logic
+// (this is exactly how the ~/.throughline EISDIR bug kept surfacing after it was fixed on disk).
+// On whoami we compare the running version against the newest one installed and, if we're the
+// stale one, say so instead of pretending to be current. Best-effort and Claude-Code-specific:
+// on other hosts the registry file is absent and the check silently no-ops (no false positive).
+function semverGt(a, b) {
+  const pa = String(a).split("."), pb = String(b).split(".");
+  for (let i = 0; i < 3; i++) {
+    const x = Number(pa[i] ?? 0), y = Number(pb[i] ?? 0);
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+function ownVersion() {
+  try {
+    const manifest = join(dirname(fileURLToPath(import.meta.url)), "..", ".claude-plugin", "plugin.json");
+    return JSON.parse(readFileSync(manifest, "utf8")).version ?? null;
+  } catch { return null; }
+}
+function latestInstalledVersion() {
+  try {
+    const reg = JSON.parse(readFileSync(join(homedir(), ".claude", "plugins", "installed_plugins.json"), "utf8"));
+    let best = null;
+    for (const e of reg?.plugins?.["throughline@throughline"] ?? []) {
+      if (e?.version && (!best || semverGt(e.version, best))) best = e.version;
+    }
+    return best;
+  } catch { return null; }
+}
+function staleNotice() {
+  const own = ownVersion(), latest = latestInstalledVersion();
+  if (own && latest && semverGt(latest, own)) {
+    return `⚠ This Throughline server is running v${own} but v${latest} is installed — you are bound to a stale process. `
+      + `Fully quit and reopen Claude Code so the new version loads; the persona/memory logic served here may be outdated until you do.`;
+  }
+  return null;
+}
 
 const TOOLS = [
   {
@@ -175,13 +219,14 @@ const TOOLS = [
 async function callTool(name, args) {
   switch (name) {
     case "whoami": {
+      const stale = staleNotice();
       const bs = await rawGet(`/selves/${encodeURIComponent(await self())}/bootstrap`).catch(() => null);
-      if (bs) return { paused: bs.paused, context: bs.context, reflection: bs.reflection, governance: bs.governance, pending: bs.pending };
+      if (bs) return { ...(stale ? { _stale: stale } : {}), paused: bs.paused, context: bs.context, reflection: bs.reflection, governance: bs.governance, pending: bs.pending };
       const [context, cu] = await Promise.all([
         getText("/context").catch(() => ""),
         get("/catchup?body=mcp").catch(() => ({ events: [], count: 0 })),
       ]);
-      return { context, since_last_session: cu.events ?? [] };
+      return { ...(stale ? { _stale: stale } : {}), context, since_last_session: cu.events ?? [] };
     }
     case "recall": {
       const params = new URLSearchParams({ q: args.query ?? "", k: String(args.k ?? 8) });
@@ -256,7 +301,7 @@ async function handle(msg) {
     return reply(id, {
       protocolVersion: params?.protocolVersion ?? "2025-06-18",
       capabilities: { tools: {} },
-      serverInfo: { name: "throughline", version: "0.6.1" },
+      serverInfo: { name: "throughline", version: ownVersion() ?? "0.0.0" },
     });
   }
   if (method === "tools/list") return reply(id, { tools: TOOLS });
