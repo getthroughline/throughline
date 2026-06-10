@@ -1,5 +1,5 @@
-// Thin client for the Throughline API (Codex adapter). Cloud-first; THROUGHLINE_URL overrides
-// for self-host. Identical key resolution to the Claude Code adapter.
+// Thin client for the Throughline API. Cloud-first: talks to the cloud by default; point
+// THROUGHLINE_URL to point at a self-hosted backend.
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +7,8 @@ import { join } from "node:path";
 const CLOUD = "https://getthroughline.ai";
 const BASE = process.env.THROUGHLINE_URL ?? CLOUD;
 
+// API key: env (e.g. set in the MCP server config) -> ~/.throughline/auth.json (saved by
+// the dashboard). Sent as a Bearer token.
 function apiKey() {
   if (process.env.THROUGHLINE_API_KEY) return process.env.THROUGHLINE_API_KEY;
   try {
@@ -15,19 +17,26 @@ function apiKey() {
     return null;
   }
 }
+// Writer provenance: which host/model is writing. Powers the cloud's conformance telemetry
+// and the fidelity gate (weak substrates lose auto-save). Override via env if embedding elsewhere.
 const SOURCE = process.env.THROUGHLINE_SOURCE ?? "codex-plugin";
-const MODEL = process.env.THROUGHLINE_MODEL ?? "";
-function authHeaders() {
+const MODEL = process.env.THROUGHLINE_MODEL ?? process.env.ANTHROPIC_MODEL ?? "";
+function authHeaders(extra = {}) {
   const key = apiKey();
   return {
     "x-throughline-source": SOURCE,
     ...(MODEL ? { "x-throughline-model": MODEL } : {}),
     ...(key ? { authorization: `Bearer ${key}` } : {}),
+    ...extra,
   };
 }
 
-// Self resolution: THROUGHLINE_SELF env -> `.throughline` project file (cwd, walking up;
-// per-project session isolation) -> account default. selfSource() reports which rule won.
+// Which self this session maps to, in priority order:
+//   1. THROUGHLINE_SELF env (explicit pin)
+//   2. a `.throughline` file in the project (cwd, walking up) — per-project session isolation:
+//      the work repo stays the work self, everywhere else stays the default
+//   3. the account's default_self
+// `selfSource()` reports which rule won, so the session hook can tell the user.
 import { existsSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 let cachedSelf, cachedSource;
@@ -95,7 +104,7 @@ export async function self() {
       const cfg = await res.json();
       if (cfg.default_self) { cachedSource = "account-default"; return (cachedSelf = cfg.default_self); }
     }
-  } catch { /* fall through */ }
+  } catch { /* unreachable — fall through */ }
   cachedSource = "fallback";
   return (cachedSelf = "assistant");
 }
@@ -103,6 +112,7 @@ export async function self() {
 async function selfPath(sub) {
   return `${BASE}/selves/${encodeURIComponent(await self())}${sub}`;
 }
+
 export async function get(sub) {
   const res = await fetch(await selfPath(sub), { headers: authHeaders() });
   if (!res.ok) throw new Error(`${sub} -> ${res.status}`);
@@ -113,11 +123,36 @@ export async function getText(sub) {
   if (!res.ok) throw new Error(`${sub} -> ${res.status}`);
   return res.text();
 }
+export async function post(sub, body) {
+  const res = await fetch(await selfPath(sub), {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify(body ?? {}),
+  });
+  if (!res.ok) throw new Error(`${sub} -> ${res.status}`);
+  return res.json();
+}
+
 export async function rawGet(path) {
   const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
   if (!res.ok) throw new Error(`${path} -> ${res.status}`);
   return res.json();
 }
+export async function rawPost(path, body) {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: authHeaders({ "content-type": "application/json" }),
+    body: JSON.stringify(body ?? {}),
+  });
+  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  return res.json();
+}
+export async function rawDelete(path) {
+  const res = await fetch(`${BASE}${path}`, { method: "DELETE", headers: authHeaders() });
+  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  return res.json();
+}
+
 export async function safe(fn, fallback) {
   try { return await fn(); } catch { return fallback; }
 }
