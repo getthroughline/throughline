@@ -5,7 +5,7 @@
   },
   "metadata": {
     "description": "Throughline — a persistent, user-owned AI self (persona + memory + rules) you carry across hosts.",
-    "version": "0.6.0"
+    "version": "0.6.1"
   },
   "plugins": [
     {
