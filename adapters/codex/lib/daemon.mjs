@@ -36,8 +36,9 @@ function projectSelf() {
   for (let i = 0; i < 12; i++) {
     const f = resolve(dir, ".throughline");
     if (existsSync(f)) {
-      const name = readFileSync(f, "utf8").trim().split("\n")[0].trim();
-      if (name) return name;
+      const first = readFileSync(f, "utf8").trim().split("\n")[0].trim();
+      if (first && first.toLowerCase() !== "off" && !first.toLowerCase().startsWith("mode=")) return first;
+      return null; // "off" or mode-only file: no self override here
     }
     const parent = dirname(dir);
     if (parent === dir) break;
@@ -46,6 +47,35 @@ function projectSelf() {
   return null;
 }
 export function selfSource() { return cachedSource ?? "default"; }
+
+// Mode = persona thickness for this session: "full" | "companion" | "work" | "off".
+// Resolution: THROUGHLINE_MODE env > `mode=` line in .throughline > adapter default.
+// "off" (also as the .throughline first line) disables injection entirely in this project —
+// a vanilla agent, no persona, no capture guidance. Presence is a dial, not a default.
+let cachedMode;
+function projectFileLines() {
+  let dir = process.cwd();
+  for (let i = 0; i < 12; i++) {
+    const f = resolve(dir, ".throughline");
+    if (existsSync(f)) return readFileSync(f, "utf8").split("\n").map((l) => l.trim()).filter(Boolean);
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
+export function sessionMode(defaultMode = "full") {
+  if (cachedMode) return cachedMode;
+  if (process.env.THROUGHLINE_MODE) return (cachedMode = process.env.THROUGHLINE_MODE);
+  const lines = projectFileLines();
+  if (lines) {
+    if (lines[0]?.toLowerCase() === "off") return (cachedMode = "off");
+    const m = lines.find((l) => l.toLowerCase().startsWith("mode="));
+    if (m) return (cachedMode = m.slice(5).trim().toLowerCase());
+  }
+  return (cachedMode = defaultMode);
+}
+
 export async function self() {
   if (cachedSelf) return cachedSelf;
   if (process.env.THROUGHLINE_SELF) { cachedSource = "env"; return (cachedSelf = process.env.THROUGHLINE_SELF); }

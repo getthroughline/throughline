@@ -2,14 +2,18 @@
 // SessionStart hook: ONE /bootstrap round trip — the context pack plus reflection / governance /
 // pending signals — and the standing instruction for the Throughline MCP tools.
 // Falls back to the legacy multi-call flow for old self-host daemons without /bootstrap.
-import { get, getText, rawGet, safe, self, selfSource } from "../lib/daemon.mjs";
+import { get, getText, rawGet, safe, self, selfSource, sessionMode } from "../lib/daemon.mjs";
 
 const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
 };
 
+const MODE = sessionMode("full");
+// "off": this project opted out — vanilla agent, no persona, no capture guidance, nothing.
+if (MODE === "off") { emit(""); process.exit(0); }
+
 const SELF = await safe(() => self(), "assistant");
-const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap`), null);
+const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(MODE)}`), null);
 
 let paused, context;
 const signals = [];
@@ -75,7 +79,14 @@ Use the throughline MCP tools:
 The persona and guardrails are owner-only — only this explicit, user-approved flow writes them;
 never change them during normal work.${noSelf ? "\n\n## First run\nThere is no self yet. Greet the user and offer to set one up using the flow above (create_self -> interview -> draft_persona -> confirm)." : ""}
 
-## Capturing to the log (tiered — follow exactly)
+${MODE === "work" ? `## Work mode — the persona is the spine, not the voice
+You carry this user's conventions, corrections, standing rules, and judgment calibration — apply
+them silently. NO relational presence: no small talk about their life, no shared-history
+callbacks, no commentary on their state. Do not capture relationship streams (persona-ledger
+about tone is fine; attunement/relationship-pulse/shared-history moments are not for work
+sessions). Capture quietly: work-relevant observations save without narration (the user reviews
+them in the dashboard); raise staged rule confirmations at a natural pause — end of task — never
+mid-flow. The user should feel a sharper tool, not a watcher.` : `## Capturing to the log (tiered — follow exactly)
 When a real decision, correction, boundary, preference, or shared moment occurs, call \`propose_events\`:
 1. **Observational memories** (shared moments, observations, records) **save immediately** and are
    retractable — mention briefly what you saved; if the user objects, call \`retract_event\`.
@@ -84,6 +95,6 @@ When a real decision, correction, boundary, preference, or shared moment occurs,
    \`confirm_events\` ONLY after explicit approval, \`reject_events\` if declined.
 3. **Loose prose** — a diary-line thought that doesn't fit a schema — goes to \`journal\`
    (no evidence ceremony; reflection distills it later).
-NEVER confirm behavior-shaping candidates without the user's explicit approval in this conversation.`;
+NEVER confirm behavior-shaping candidates without the user's explicit approval in this conversation.`}`;
 
 emit([guidance, ...signals, context].filter(Boolean).join("\n\n"));

@@ -2,14 +2,18 @@
 // SessionStart hook (Codex): ONE /bootstrap round trip — context pack + reflection / governance /
 // pending signals — plus tool guidance. Falls back to the legacy flow for old self-host daemons.
 // NOTE: the output contract below mirrors Claude Code's; verify against Codex's hook output spec.
-import { get, getText, rawGet, safe, self, selfSource } from "../lib/daemon.mjs";
+import { get, getText, rawGet, safe, self, selfSource, sessionMode } from "../lib/daemon.mjs";
 
 const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
 };
 
+// Codex is a coding agent: default to WORK mode — spine (rules/corrections/calibration), no voice.
+const MODE = sessionMode("work");
+if (MODE === "off") { emit(""); process.exit(0); }
+
 const SELF = await safe(() => self(), "assistant");
-const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap`), null);
+const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(MODE)}`), null);
 
 let paused, context;
 const signals = [];
@@ -65,11 +69,15 @@ Use the throughline MCP tools:
 Create: \`create_self\` -> interview -> \`draft_persona\` (slots soul/identity/user) -> show ->
 \`confirm_events\` after approval. Switch: \`use_self\`. List: \`list_selves\`.${noSelf ? "\n\n## First run\nThere is no self yet. Greet the user and offer to set one up (create_self -> interview -> draft_persona -> confirm)." : ""}
 
-## Capturing (tiered — follow exactly)
+${MODE === "work" ? `## Work mode — the persona is the spine, not the voice
+Apply the user's conventions, corrections, standing rules, and calibration silently. NO relational
+presence: no life small talk, no shared-history callbacks. Don't capture relationship streams from
+work sessions. Capture quietly — no save narration (the dashboard Review covers it); raise staged
+rule confirmations at a natural pause, never mid-flow. A sharper tool, not a watcher.` : `## Capturing (tiered — follow exactly)
 On a real decision/correction/boundary/shared moment, call \`propose_events\`:
 observational memories **save immediately** (retractable via \`retract_event\` — mention what you
 saved); behavior-shaping rows (rules, tone, stances, risks) come back **staged** — show a one-line
 summary and \`confirm_events\` ONLY after explicit approval (\`reject_events\` if declined).
-Loose prose goes to \`journal\` — no schema; reflection distills it later.`;
+Loose prose goes to \`journal\` — no schema; reflection distills it later.`}`;
 
 emit([guidance, ...signals, context].filter(Boolean).join("\n\n"));
