@@ -8,6 +8,10 @@ set -euo pipefail
 
 BASE="${THROUGHLINE_URL:-https://getthroughline.ai}"
 KEY="${THROUGHLINE_API_KEY:-}"
+# isolated cron sessions may not inherit the env — fall back to ~/.openclaw/.env directly
+if [ -z "$KEY" ] && [ -f "$HOME/.openclaw/.env" ]; then
+  KEY="$(grep '^THROUGHLINE_API_KEY=' "$HOME/.openclaw/.env" | head -1 | cut -d= -f2-)"
+fi
 [ -z "$KEY" ] && { echo "THROUGHLINE_API_KEY not set (get it at $BASE/account)"; exit 1; }
 
 auth=(-H "authorization: Bearer $KEY" -H "x-throughline-source: openclaw" -H "content-type: application/json")
@@ -28,9 +32,10 @@ case "${1:-help}" in
     curl -sf "$BASE/selves/$(self)/bootstrap?mode=${2:-full}" "${auth[@]}" ;;
   journal)     # journal "a one-line diary note" — the main capture path, cheap and frequent
     shift; curl -sf -X POST "$BASE/selves/$(self)/journal" "${auth[@]}" -d "{\"content\": $(printf '%s' "$*" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')}" ;;
-  recall)      # recall "query" [k] — search memory before claiming you don't remember
+  recall)      # recall "query" [k] [stream] — search memory; empty query + stream = last k rows of that stream
     q=$(printf '%s' "$2" | python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.stdin.read()))')
-    curl -sf "$BASE/selves/$(self)/recall?q=$q&k=${3:-8}" "${auth[@]}" ;;
+    st=""; [ -n "${4:-}" ] && st="&stream=$4"
+    curl -sf "$BASE/selves/$(self)/recall?q=$q&k=${3:-8}$st" "${auth[@]}" ;;
   context)     # the injected self-context only
     curl -sf "$BASE/selves/$(self)/context" "${auth[@]}" ;;
   propose)     # propose '<events-json>' — structured capture (rules/corrections stage for the user)
