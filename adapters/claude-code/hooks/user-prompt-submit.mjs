@@ -57,11 +57,14 @@ function shouldNudge() {
 
 if (!shouldNudge()) process.exit(0);
 
-emit(`## Throughline reflection queued (do not interrupt)
+emit(`## Throughline reflection queued (ask first, never auto-run)
 Reflection is due for "${SELF}": ${count} raw memories have accrued.
 
-Treat this as a background maintenance task, not a reason to derail the user's current request:
-1. Answer or complete the user's current request first.
-2. At the first natural pause, run the reflection flow: call \`reflect\`, distill a few grounded candidate memories, and show the user a concise approval summary.
-3. Only after the user approves, call \`confirm_events\` / \`reject_events\` as appropriate, then \`complete_reflection\` with the cursor returned by \`reflect\` (expected cursor: ${cursor}).
-4. If the user keeps steering elsewhere, mention briefly at the end that reflection is due and can run next.`);
+This is background maintenance — and running it READS the self's accrued private memories, so it
+needs the user's go-ahead:
+1. Answer or complete the user's current request first. Do NOT call \`reflect\` on your own.
+2. At the first natural pause, ask in one line: "Reflection is due (${count} raw memories) — run it now?"
+3. ONLY if they agree: call \`reflect\`, distill a few grounded candidates, show a concise approval
+   summary, \`confirm_events\` / \`reject_events\` per their answer, then \`complete_reflection\`
+   (expected cursor: ${cursor}).
+4. If they decline or steer elsewhere, drop it — the cloud heartbeat will catch it eventually.`);
