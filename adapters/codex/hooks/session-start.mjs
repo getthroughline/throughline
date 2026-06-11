@@ -26,13 +26,15 @@ const signals = [];
 if (bs) {
   paused = !!bs.paused;
   context = bs.context ?? "";
-  if (bs.reflection?.due)
-    signals.push(`## Reflection queued (ask first)\n${bs.reflection.newCount} raw memories accrued. Never run it unprompted — reflecting reads the self's accrued private memories. At a natural pause ask "reflection is due — run it now?"; only on the user's yes call \`reflect\`, distill, then \`complete_reflection\`. If declined, the cloud heartbeat catches it.`);
-  if (bs.governance?.due)
-    signals.push("## Rule consolidation due\nMerge same-direction rules via `supersedes`; classify genuine contradictions as `tension`. Rules must distill, not accumulate.");
+  // Nudge budget: at most ONE ask per session start (review pending > reflect > under-capture);
+  // governance rides with reflection. Mirrors the claude-code hook.
   if (bs.pending > 0)
-    signals.push(`_(${bs.pending} staged candidate${bs.pending > 1 ? "s" : ""} awaiting confirmation.)_`);
-  if (bs.starved)
+    signals.push(`## Staged memories awaiting your user's review (${bs.pending})\nDistilled earlier, waiting for approval. At a natural pause offer ONCE: "I have ${bs.pending} staged memor${bs.pending > 1 ? "ies" : "y"} from earlier reflection — go through them now? Takes a minute." On yes: call \`pending\`, show one-line summaries, then \`confirm_events\` (approved ids) / \`reject_events\` (declined) — the whole review happens in the conversation, no dashboard needed. If declined, drop it and never re-ask this session.`);
+  else if (bs.reflection?.due) {
+    signals.push(`## Reflection queued (ask first)\n${bs.reflection.newCount} raw memories accrued. Never run it unprompted — reflecting reads the self's accrued private memories. At a natural pause ask "reflection is due — run it now?"; only on the user's yes call \`reflect\`, distill, then \`complete_reflection\`. If declined, the cloud heartbeat catches it.`);
+    if (bs.governance?.due)
+      signals.push("## Rule consolidation due\nMerge same-direction rules via `supersedes`; classify genuine contradictions as `tension`. Rules must distill, not accumulate.");
+  } else if (bs.starved)
     signals.push("## You've been under-capturing\nSessions happened this week but NO memory accrued. Fix it this session: journal at natural breakpoints, and at a pause ask the user if anything from recent days is worth backfilling (they retell, you journal — never reconstruct yourself).");
 } else {
   // distinguish a legacy daemon (no /bootstrap) from a real connection/auth failure — see claude-code hook.
