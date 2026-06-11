@@ -3,6 +3,8 @@
 Carries a Throughline self into an OpenClaw workspace — same self, same memory as the web,
 Claude Code, Codex, and ChatGPT. In OpenClaw's native idiom: one exec script, two snippets.
 
+Requires `curl` and `python3` (for URL/JSON encoding) — both standard on macOS and Linux.
+
 ## Install — one line
 
 ```bash

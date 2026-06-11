@@ -52,6 +52,19 @@ case "${1:-help}" in
     curl -sf "$BASE/selves/$(self)/reflect" "${auth[@]}" ;;
   reflect-done) # reflect-done <cursor> — advance the watermark after distilling
     curl -sf -X POST "$BASE/selves/$(self)/reflect/complete" "${auth[@]}" -d "{\"cursor\":$2}" ;;
+  coverage)    # coverage "topic" — honest "how well do I know X?" (none/thin/partial/strong)
+    t=$(printf '%s' "$2" | python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.stdin.read()))')
+    curl -sf "$BASE/selves/$(self)/coverage?topic=$t" "${auth[@]}" ;;
+  selves)      # list this account's selves and the default
+    curl -sf "$BASE/selves" "${auth[@]}" ;;
+  create)      # create <name> — make a new self (name: letters/digits/dash/underscore/dot, 1-40)
+    curl -sf -X POST "$BASE/selves/$2" "${auth[@]}" ;;
+  use)         # use <name> — set the account default self (or pin per-workspace via .throughline)
+    curl -sf -X POST "$BASE/config" "${auth[@]}" -d "{\"default_self\":\"$2\"}" ;;
+  delete)      # delete <name> — permanently delete a self and all its memory (export first!)
+    curl -sf -X DELETE "$BASE/selves/$2" "${auth[@]}" ;;
+  draft-persona) # draft-persona '<docs-json>' — stage soul/identity/user docs for confirmation
+    curl -sf -X POST "$BASE/selves/$(self)/capture/draft-persona" "${auth[@]}" -d "$2" ;;
   *)
     sed -n '2,6p' "$0"; echo; grep -E '^  [a-z-]+\)' "$0" | sed 's/).*#/ —/' ;;
 esac
