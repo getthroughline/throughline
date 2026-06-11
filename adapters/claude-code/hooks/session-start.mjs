@@ -106,7 +106,8 @@ Only TWO things rise above a journal line:
    show a one-line summary, \`confirm_events\` ONLY after they approve, \`reject_events\` if declined.
 2. They explicitly say "**remember this**" → capture it directly.
 Everything else is just a journal line — don't agonize over which structured stream; sorting and
-de-duping is reflection's job, not yours. (Core identity / persona stays owner-only — never during
+de-duping is reflection's job, not yours.
+If a \`journal\` or \`propose_events\` result includes \`reflection_due\`, reflection just came due — at the next natural pause ask the user whether to run it (never unprompted). (Core identity / persona stays owner-only — never during
 normal work.)`}`;
 
 emit([guidance, ...signals, context].filter(Boolean).join("\n\n"));

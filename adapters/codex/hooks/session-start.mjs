@@ -90,6 +90,7 @@ reflection distills into structured memory; end a substantive exchange having jo
 and you under-captured. Only TWO things rise above a journal line: (1) a standing rule / boundary /
 correction the user states → \`propose_events\` a \`permission-policy\`/\`correction-rules\` row
 (staged) → \`confirm_events\` only after they approve; (2) they say "remember this" → capture
-directly. Everything else is just a journal line — sorting and de-duping is reflection's job.`}`;
+directly. Everything else is just a journal line — sorting and de-duping is reflection's job.
+If a \`journal\` or \`propose_events\` result includes \`reflection_due\`, reflection just came due — at the next natural pause ask the user whether to run it (never unprompted).`}`;
 
 emit([guidance, ...signals, context].filter(Boolean).join("\n\n"));

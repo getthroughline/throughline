@@ -21,3 +21,6 @@ Only TWO things rise above a journal line:
 Before claiming you don't remember something, run `scripts/throughline.sh recall "<query>"`.
 Record observable behavior only — never inferred feelings, never self-praise. Your core
 identity is owner-only: never propose `persona` events during normal work.
+
+If a journal result includes `reflection_due`, reflection just came due — at a natural pause ask
+Nian whether to run it now (never unprompted; the cloud heartbeat catches it otherwise).
