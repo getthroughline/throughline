@@ -9,7 +9,8 @@ upgrade, years pass; it's still itself, and it still remembers.
 → **[getthroughline.ai](https://getthroughline.ai)**
 
 This repository is the open client: the Claude Code and Codex plugins that connect your editor
-to your Throughline self.
+to your Throughline self. It also carries the canonical **[portable-self format spec v1](SPEC.md)** —
+an append-only log of content-addressed events; any conforming store or host can carry your self.
 
 ## Install (Claude Code)
 
