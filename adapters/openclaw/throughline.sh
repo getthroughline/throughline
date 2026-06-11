@@ -44,6 +44,8 @@ case "${1:-help}" in
     curl -sf "$BASE/selves/$(self)/capture/pending" "${auth[@]}" ;;
   confirm)     # confirm <event-id> — ONLY after the user explicitly approved in conversation
     curl -sf -X POST "$BASE/selves/$(self)/capture/confirm" "${auth[@]}" -d "{\"id\":\"$2\"}" ;;
+  reject)      # reject <event-id> — discard a staged candidate the user declined
+    curl -sf -X POST "$BASE/selves/$(self)/capture/reject" "${auth[@]}" -d "{\"id\":\"$2\"}" ;;
   retract)     # retract <event-id> — delete a wrongly captured memory
     curl -sf -X POST "$BASE/selves/$(self)/capture/retract" "${auth[@]}" -d "{\"id\":\"$2\"}" ;;
   reflect)     # raw material + guidance for consolidation (run from HEARTBEAT when due)
