@@ -2,7 +2,7 @@
 // Minimal MCP stdio server (JSON-RPC 2.0, newline-delimited), no SDK / no deps.
 // Exposes the Throughline API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
-import { get, getText, post, rawDelete, rawGet, rawPost, self } from "../lib/daemon.mjs";
+import { get, getText, post, rawDelete, rawGet, rawPost, rebindSelf, self } from "../lib/daemon.mjs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -280,14 +280,24 @@ async function callTool(name, args) {
     }
     case "create_self":
       return rawPost(`/selves/${encodeURIComponent(args.name)}`, {});
-    case "use_self":
-      return rawPost("/config", { default_self: args.name });
+    case "use_self": {
+      const r = await rawPost("/config", { default_self: args.name });
+      // re-point THIS session too — otherwise every later write lands on the old self
+      const rebound = rebindSelf(args.name);
+      return rebound ? r : { ...r, notice: `account default switched, but this session is pinned to "${await self()}" (env/.throughline) — the pin still applies here` };
+    }
     case "pause":
       return rawPost("/config", { paused: true });
-    case "resume":
-      return rawPost("/config", args.name ? { default_self: args.name } : { paused: false });
-    case "delete_self":
-      return rawDelete(`/selves/${encodeURIComponent(args.name)}`);
+    case "resume": {
+      const r = await rawPost("/config", args.name ? { default_self: args.name } : { paused: false });
+      if (args.name) rebindSelf(args.name);
+      return r;
+    }
+    case "delete_self": {
+      const r = await rawDelete(`/selves/${encodeURIComponent(args.name)}`);
+      if (args.name === (await self())) rebindSelf(null); // re-resolve from account default next call
+      return r;
+    }
     case "draft_persona":
       return post("/capture/draft-persona", { docs: args.docs ?? [] });
     default:

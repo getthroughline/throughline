@@ -121,6 +121,19 @@ export async function self() {
   return (cachedSelf = "assistant");
 }
 
+/**
+ * Re-point the session's cached self after use_self/resume/delete_self. Without this, every
+ * later write (draft_persona, journal, propose) silently lands on the OLD self — draft_persona
+ * after a switch even staged a supersedes against the old self's soul. env/project bindings are
+ * deliberate pins and win; return false so the caller can tell the user the session stays pinned.
+ */
+export function rebindSelf(name) {
+  if (cachedSource === "env" || cachedSource === "project") return false;
+  cachedSelf = name || undefined; // undefined → next self() re-resolves from account default
+  if (name) cachedSource = "account-default";
+  return true;
+}
+
 async function selfPath(sub) {
   return `${BASE}/selves/${encodeURIComponent(await self())}${sub}`;
 }
