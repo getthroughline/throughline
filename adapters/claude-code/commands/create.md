@@ -26,4 +26,6 @@ Follow this flow exactly:
    neither → done.
 
 Finish with one line on how to talk to it (new session picks it up) and how to edit it later
-(dashboard → Identity, or this flow again).
+(dashboard → Identity, or this flow again). Then set the expectation honestly, in one sentence:
+right now it KNOWS you (the interview) but doesn't yet UNDERSTAND you — that takes lived
+sessions; suggest they revisit this thought in two weeks and notice the difference.
