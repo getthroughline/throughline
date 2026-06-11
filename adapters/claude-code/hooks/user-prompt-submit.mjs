@@ -16,10 +16,17 @@ if (!hasKey() && !process.env.THROUGHLINE_URL) process.exit(0);
 if (sessionMode("full") === "off") process.exit(0);
 
 const SELF = await safe(() => self(), "assistant");
-const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(sessionMode("full"))}`), null);
-if (!bs || bs.paused || !bs.reflection?.due) process.exit(0);
-
-const reflection = bs.reflection;
+// light status endpoint — this hook fires on EVERY prompt, so it must not make the server
+// compute a full context pack each time. Falls back to /bootstrap for older servers.
+let reflection = null, paused = false;
+const light = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/reflection`), null);
+if (light && typeof light.due === "boolean") {
+  reflection = light; paused = !!light.paused;
+} else {
+  const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(sessionMode("full"))}`), null);
+  reflection = bs?.reflection ?? null; paused = !!bs?.paused;
+}
+if (paused || !reflection?.due) process.exit(0);
 const count = reflection.newCount ?? reflection.count ?? "multiple";
 const cursor = reflection.cursor ?? reflection.watermark ?? "from reflect()";
 const stateKey = `${SELF}:${cursor}:${count}`;
