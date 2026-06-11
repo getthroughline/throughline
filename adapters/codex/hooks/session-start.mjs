@@ -19,7 +19,14 @@ const MODE = sessionMode("work");
 if (MODE === "off") { emit(""); process.exit(0); }
 
 const SELF = await safe(() => self(), "assistant");
-const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(MODE)}`), null);
+// project identity for the cross-host handoff: the git repo name, else the folder name
+let PROJECT = "";
+try {
+  const { execSync } = await import("node:child_process");
+  const { basename } = await import("node:path");
+  try { PROJECT = basename(execSync("git rev-parse --show-toplevel", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim()); } catch { PROJECT = basename(process.cwd()); }
+} catch { /* no project context — fine */ }
+const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(MODE)}${PROJECT ? `&project=${encodeURIComponent(PROJECT)}` : ""}`), null);
 
 let paused, context, connFailed = false, authFailed = false;
 const signals = [];

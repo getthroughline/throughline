@@ -122,6 +122,14 @@ const TOOLS = [
     inputSchema: { type: "object", properties: { content: { type: "string" } }, required: ["content"] },
   },
   {
+    name: "handoff",
+    description:
+      "Cross-host work handoff: ONE terse line as a session winds down — what changed, what's next, " +
+      "where it's stuck — keyed by project (repo/folder name). The next session on any host, any " +
+      "machine opens from it. Skip when nothing moved.",
+    inputSchema: { type: "object", properties: { project: { type: "string" }, note: { type: "string" } }, required: ["project", "note"] },
+  },
+  {
     name: "retract_event",
     description: "Delete a wrongly captured memory by id (the undo for auto-saved events).",
     inputSchema: { type: "object", properties: { id: { type: "string" } }, required: ["id"] },
@@ -231,6 +239,8 @@ async function callTool(name, args) {
     }
     case "propose_events":
       return post("/capture/propose", { events: args.events ?? [], source: "codex" });
+    case "handoff":
+      return post("/handoff", { project: args.project ?? "", note: args.note ?? "" });
     case "journal": {
       const saved = await post("/journal", { content: args.content ?? "" });
       const bs = await rawGet(`/selves/${encodeURIComponent(await self())}/bootstrap`).catch(() => null);
