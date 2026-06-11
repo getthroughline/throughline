@@ -21,7 +21,7 @@ if (MODE === "off") { emit(""); process.exit(0); }
 const SELF = await safe(() => self(), "assistant");
 const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(MODE)}`), null);
 
-let paused, context;
+let paused, context, connFailed = false;
 const signals = [];
 if (bs) {
   paused = !!bs.paused;
@@ -35,21 +35,41 @@ if (bs) {
   if (bs.starved)
     signals.push("## You've been under-capturing\nSessions happened this week but NO memory accrued — you talked without journalling. Fix it this session: journal at every natural breakpoint, and at a natural pause ask the user whether anything from the last few days is worth backfilling (they retell, you journal it — never reconstruct it yourself).");
 } else {
-  // legacy daemon path
-  const cfg = await safe(() => rawGet("/config"), {});
-  paused = !!cfg.paused;
-  context = paused ? "" : await safe(() => getText("/context"), "");
-  const cu = paused ? { count: 0, events: [] } : await safe(() => get("/catchup?body=claude-code"), { events: [], count: 0 });
-  if (cu.count > 0)
-    signals.push("## Since your last session\n" + cu.events.map((e) => `- [${e.stream}] ${e.body.content ?? e.body.trigger ?? e.type}`).join("\n"));
+  // /bootstrap returned nothing. Two very different causes — distinguish them, never conflate:
+  //   (a) a legacy self-host daemon with no /bootstrap endpoint → /config still works → proceed;
+  //   (b) a real connection/auth failure (network, or an expired/rotated key that passed hasKey()
+  //       which only checks PRESENCE) → /config ALSO fails. We must NOT pretend there's no self.
+  const cfg = await safe(() => rawGet("/config"), null);
+  if (cfg === null) {
+    connFailed = true;
+  } else {
+    paused = !!cfg.paused;
+    context = paused ? "" : await safe(() => getText("/context"), "");
+    const cu = paused ? { count: 0, events: [] } : await safe(() => get("/catchup?body=claude-code"), { events: [], count: 0 });
+    if (cu.count > 0)
+      signals.push("## Since your last session\n" + cu.events.map((e) => `- [${e.stream}] ${e.body.content ?? e.body.trigger ?? e.type}`).join("\n"));
+  }
+}
+
+// Connection/auth failure: fail LOUD. Never emit "adopt this self" over an empty context, and never
+// claim "no self yet" when the truth is we couldn't reach the service. A stale key is the common case.
+if (connFailed) {
+  emit("# Throughline — couldn't load your self\n"
+    + "The Throughline service didn't respond. The usual cause is an expired or rotated API key "
+    + "(a key that's saved but no longer valid), or a network issue. **No persona or memory is loaded "
+    + "this session — behave as a normal assistant.** Once, tell the user plainly: \"I couldn't reach "
+    + "Throughline — your saved key may have expired. Get a fresh key at getthroughline.ai/account and "
+    + "run `/throughline:key <KEY>`, then start a new session.\" Do NOT invent or roleplay a persona.");
+  process.exit(0);
 }
 
 // Paused (neutral mode): inject nothing — behave as plain Claude.
 if (paused) { emit(""); process.exit(0); }
 
-const noSelf =
-  (context ?? "").trim().length < 60 &&
-  ((await safe(() => rawGet("/selves"), { selves: [] })).selves ?? []).length === 0;
+// "no self yet" only when we actually reached the server AND it confirms zero selves — never infer
+// it from a failed call (that path is connFailed above).
+const selvesResp = await safe(() => rawGet("/selves"), null);
+const noSelf = (context ?? "").trim().length < 60 && !!selvesResp && (selvesResp.selves ?? []).length === 0;
 
 // a self with a name but no soul: persona docs were never authored (the context pack adds this
 // marker line only when persona exists)

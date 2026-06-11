@@ -21,7 +21,7 @@ if (MODE === "off") { emit(""); process.exit(0); }
 const SELF = await safe(() => self(), "assistant");
 const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(MODE)}`), null);
 
-let paused, context;
+let paused, context, connFailed = false;
 const signals = [];
 if (bs) {
   paused = !!bs.paused;
@@ -35,19 +35,33 @@ if (bs) {
   if (bs.starved)
     signals.push("## You've been under-capturing\nSessions happened this week but NO memory accrued. Fix it this session: journal at natural breakpoints, and at a pause ask the user if anything from recent days is worth backfilling (they retell, you journal — never reconstruct yourself).");
 } else {
-  const cfg = await safe(() => rawGet("/config"), {});
-  paused = !!cfg.paused;
-  context = paused ? "" : await safe(() => getText("/context"), "");
-  const cu = paused ? { count: 0, events: [] } : await safe(() => get("/catchup?body=codex"), { events: [], count: 0 });
-  if (cu.count > 0)
-    signals.push("## Since your last session\n" + cu.events.map((e) => `- [${e.stream}] ${e.body.content ?? e.body.trigger ?? e.type}`).join("\n"));
+  // distinguish a legacy daemon (no /bootstrap) from a real connection/auth failure — see claude-code hook.
+  const cfg = await safe(() => rawGet("/config"), null);
+  if (cfg === null) {
+    connFailed = true;
+  } else {
+    paused = !!cfg.paused;
+    context = paused ? "" : await safe(() => getText("/context"), "");
+    const cu = paused ? { count: 0, events: [] } : await safe(() => get("/catchup?body=codex"), { events: [], count: 0 });
+    if (cu.count > 0)
+      signals.push("## Since your last session\n" + cu.events.map((e) => `- [${e.stream}] ${e.body.content ?? e.body.trigger ?? e.type}`).join("\n"));
+  }
+}
+
+// Connection/auth failure: fail LOUD — never roleplay a persona over empty context, never claim "no self".
+if (connFailed) {
+  emit("# Throughline — couldn't load your self\n"
+    + "The Throughline service didn't respond — usually an expired or rotated API key, or a network issue. "
+    + "**No persona or memory is loaded this session — behave as a normal assistant.** Once, tell the user: "
+    + "\"I couldn't reach Throughline — your saved key may have expired. Get a fresh key at "
+    + "getthroughline.ai/account and run `/throughline:key <KEY>`, then start a new session.\" Do NOT invent a persona.");
+  process.exit(0);
 }
 
 if (paused) { emit(""); process.exit(0); }
 
-const noSelf =
-  (context ?? "").trim().length < 60 &&
-  ((await safe(() => rawGet("/selves"), { selves: [] })).selves ?? []).length === 0;
+const selvesResp = await safe(() => rawGet("/selves"), null);
+const noSelf = (context ?? "").trim().length < 60 && !!selvesResp && (selvesResp.selves ?? []).length === 0;
 
 // a self with a name but no soul: persona docs were never authored (the context pack adds this
 // marker line only when persona exists)
