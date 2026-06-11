@@ -189,3 +189,28 @@ export async function rawDelete(path) {
 export async function safe(fn, fallback) {
   try { return await fn(); } catch { return fallback; }
 }
+
+// --- offline snapshot: yesterday's self beats no self, but ONLY for transient failures ---
+// Mirrors the claude-code adapter: good bootstraps refresh a local copy; the session hook serves
+// it (with an offline marker) when the cloud is unreachable. Auth failures are excluded on
+// purpose — a stale key needs the user to fix it, not a paper-over.
+import { mkdirSync, writeFileSync } from "node:fs";
+const SNAP_DIR = join(homedir(), ".throughline", "cache");
+const snapPath = (selfName, mode) => join(SNAP_DIR, `${String(selfName).replace(/[^\w.-]/g, "_")}.${mode}.json`);
+export function writeSnapshot(selfName, mode, context) {
+  try {
+    if (!context || context.trim().length < 60) return;
+    mkdirSync(SNAP_DIR, { recursive: true });
+    writeFileSync(snapPath(selfName, mode), JSON.stringify({ ts: new Date().toISOString(), self: selfName, mode, context }), { mode: 0o600 });
+  } catch { /* best-effort */ }
+}
+export function readSnapshot(selfName, mode, maxAgeDays = 14) {
+  try {
+    const s = JSON.parse(readFileSync(snapPath(selfName, mode), "utf8"));
+    if (!s?.context) return null;
+    const ageDays = (Date.now() - Date.parse(s.ts)) / 86_400_000;
+    return Number.isFinite(ageDays) && ageDays <= maxAgeDays ? s : null;
+  } catch { return null; }
+}
+/** 401/403 from the cloud = key problem (fix it), anything else = transient (snapshot ok). */
+export const isAuthError = (e) => /-> 40[13]\b/.test(String(e?.message ?? ""));

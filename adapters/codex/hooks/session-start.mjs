@@ -2,7 +2,7 @@
 // SessionStart hook (Codex): ONE /bootstrap round trip — context pack + reflection / governance /
 // pending signals — plus tool guidance. Falls back to the legacy flow for old self-host daemons.
 // NOTE: the output contract below mirrors Claude Code's; verify against Codex's hook output spec.
-import { get, getText, rawGet, safe, self, selfSource, sessionMode, hasKey } from "../lib/daemon.mjs";
+import { get, getText, isAuthError, rawGet, readSnapshot, safe, self, selfSource, sessionMode, hasKey, writeSnapshot } from "../lib/daemon.mjs";
 
 const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
@@ -21,11 +21,12 @@ if (MODE === "off") { emit(""); process.exit(0); }
 const SELF = await safe(() => self(), "assistant");
 const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(MODE)}`), null);
 
-let paused, context, connFailed = false;
+let paused, context, connFailed = false, authFailed = false;
 const signals = [];
 if (bs) {
   paused = !!bs.paused;
   context = bs.context ?? "";
+  if (!paused) writeSnapshot(SELF, MODE, context); // refresh the offline copy on every good start
   // Nudge budget: at most ONE ask per session start (review pending > reflect > under-capture);
   // governance rides with reflection. Mirrors the claude-code hook.
   if (bs.pending > 0)
@@ -38,7 +39,8 @@ if (bs) {
     signals.push("## You've been under-capturing\nSessions happened this week but NO memory accrued. Fix it this session: journal at natural breakpoints, and at a pause ask the user if anything from recent days is worth backfilling (they retell, you journal — never reconstruct yourself).");
 } else {
   // distinguish a legacy daemon (no /bootstrap) from a real connection/auth failure — see claude-code hook.
-  const cfg = await safe(() => rawGet("/config"), null);
+  let cfg = null;
+  try { cfg = await rawGet("/config"); } catch (e) { authFailed = isAuthError(e); }
   if (cfg === null) {
     connFailed = true;
   } else {
@@ -50,13 +52,29 @@ if (bs) {
   }
 }
 
-// Connection/auth failure: fail LOUD — never roleplay a persona over empty context, never claim "no self".
+// Connection/auth failure: split by cause. Transient (network/timeout) serves the local snapshot —
+// yesterday's self beats no self. Auth failure stays LOUD: a stale key needs fixing, not paper.
 if (connFailed) {
+  const snap = authFailed ? null : readSnapshot(SELF, MODE);
+  if (snap) {
+    emit(`# Throughline — offline copy (cloud unreachable right now)\n`
+      + `The service didn't respond, so below is your self "${SELF}" from a local snapshot taken `
+      + `${String(snap.ts).slice(0, 10)}. Adopt the identity, rules, and memory below as usual — but the memory `
+      + `TOOLS (recall, journal, propose) will fail until the connection returns: do not claim to have `
+      + `saved anything, and offer to note things down so the user can re-tell them next session. `
+      + `Mention the offline state once, briefly, only if relevant.\n\n${snap.context}`);
+    process.exit(0);
+  }
   emit("# Throughline — couldn't load your self\n"
-    + "The Throughline service didn't respond — usually an expired or rotated API key, or a network issue. "
-    + "**No persona or memory is loaded this session — behave as a normal assistant.** Once, tell the user: "
-    + "\"I couldn't reach Throughline — your saved key may have expired. Get a fresh key at "
-    + "getthroughline.ai/account and run `/throughline:key <KEY>`, then start a new session.\" Do NOT invent a persona.");
+    + (authFailed
+      ? "Your saved API key was rejected (expired or rotated). **No persona or memory is loaded this "
+        + "session — behave as a normal assistant.** Once, tell the user: \"Your Throughline key is no "
+        + "longer valid — get a fresh one at getthroughline.ai/account and run `/throughline:key <KEY>`, "
+        + "then start a new session.\" Do NOT invent a persona."
+      : "The Throughline service didn't respond (network issue or outage) and no recent local snapshot "
+        + "exists. **No persona or memory is loaded this session — behave as a normal assistant.** Once, "
+        + "tell the user: \"I couldn't reach Throughline — likely a network blip; a new session usually "
+        + "fixes it.\" Do NOT invent a persona."));
   process.exit(0);
 }
 

@@ -2,7 +2,7 @@
 // SessionStart hook: ONE /bootstrap round trip — the context pack plus reflection / governance /
 // pending signals — and the standing instruction for the Throughline MCP tools.
 // Falls back to the legacy multi-call flow for old self-host daemons without /bootstrap.
-import { get, getText, rawGet, safe, self, selfSource, sessionMode, hasKey } from "../lib/daemon.mjs";
+import { get, getText, isAuthError, rawGet, readSnapshot, safe, self, selfSource, sessionMode, hasKey, writeSnapshot } from "../lib/daemon.mjs";
 
 const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
@@ -21,11 +21,12 @@ if (MODE === "off") { emit(""); process.exit(0); }
 const SELF = await safe(() => self(), "assistant");
 const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(MODE)}`), null);
 
-let paused, context, connFailed = false;
+let paused, context, connFailed = false, authFailed = false;
 const signals = [];
 if (bs) {
   paused = !!bs.paused;
   context = bs.context ?? "";
+  if (!paused) writeSnapshot(SELF, MODE, context); // refresh the offline copy on every good start
   // Nudge budget: at most ONE ask per session start — stacked asks read as nagging, and nagging
   // gets the whole product tuned out. Priority: review staged memories (clears the queue, all
   // in-conversation) > reflection (which would only stage more) > under-capture coaching.
@@ -43,7 +44,8 @@ if (bs) {
   //   (a) a legacy self-host daemon with no /bootstrap endpoint → /config still works → proceed;
   //   (b) a real connection/auth failure (network, or an expired/rotated key that passed hasKey()
   //       which only checks PRESENCE) → /config ALSO fails. We must NOT pretend there's no self.
-  const cfg = await safe(() => rawGet("/config"), null);
+  let cfg = null;
+  try { cfg = await rawGet("/config"); } catch (e) { authFailed = isAuthError(e); }
   if (cfg === null) {
     connFailed = true;
   } else {
@@ -55,15 +57,30 @@ if (bs) {
   }
 }
 
-// Connection/auth failure: fail LOUD. Never emit "adopt this self" over an empty context, and never
-// claim "no self yet" when the truth is we couldn't reach the service. A stale key is the common case.
+// Connection/auth failure: split by cause. A TRANSIENT failure (network blip, timeout) serves the
+// local snapshot — yesterday's self beats no self. An AUTH failure stays loud: a stale key needs
+// the user to fix it, and the snapshot would hide the one signal that gets it fixed.
 if (connFailed) {
+  const snap = authFailed ? null : readSnapshot(SELF, MODE);
+  if (snap) {
+    emit(`# Throughline — offline copy (cloud unreachable right now)\n`
+      + `The service didn't respond, so below is your self "${SELF}" from a local snapshot taken `
+      + `${String(snap.ts).slice(0, 10)}. Adopt the identity, rules, and memory below as usual — but the memory `
+      + `TOOLS (recall, journal, propose) will fail until the connection returns: do not claim to have `
+      + `saved anything, and offer to note things down so the user can re-tell them next session. `
+      + `Mention the offline state once, briefly, only if relevant.\n\n${snap.context}`);
+    process.exit(0);
+  }
   emit("# Throughline — couldn't load your self\n"
-    + "The Throughline service didn't respond. The usual cause is an expired or rotated API key "
-    + "(a key that's saved but no longer valid), or a network issue. **No persona or memory is loaded "
-    + "this session — behave as a normal assistant.** Once, tell the user plainly: \"I couldn't reach "
-    + "Throughline — your saved key may have expired. Get a fresh key at getthroughline.ai/account and "
-    + "run `/throughline:key <KEY>`, then start a new session.\" Do NOT invent or roleplay a persona.");
+    + (authFailed
+      ? "Your saved API key was rejected (expired or rotated). **No persona or memory is loaded this "
+        + "session — behave as a normal assistant.** Once, tell the user plainly: \"Your Throughline key "
+        + "is no longer valid — get a fresh one at getthroughline.ai/account and run `/throughline:key <KEY>`, "
+        + "then start a new session.\" Do NOT invent or roleplay a persona."
+      : "The Throughline service didn't respond (network issue or outage) and no recent local snapshot "
+        + "exists. **No persona or memory is loaded this session — behave as a normal assistant.** Once, "
+        + "tell the user plainly: \"I couldn't reach Throughline — likely a network blip; a new session "
+        + "usually fixes it.\" Do NOT invent or roleplay a persona."));
   process.exit(0);
 }
 
