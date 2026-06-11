@@ -138,14 +138,22 @@ async function selfPath(sub) {
   return `${BASE}/selves/${encodeURIComponent(await self())}${sub}`;
 }
 
+// surface the cloud's own error text — a bare "-> 400" hides a perfectly good explanation
+// (e.g. self-name rules) and leaves the user guessing.
+async function httpError(label, res) {
+  let detail = "";
+  try { detail = (await res.json()).error ?? ""; } catch { /* non-JSON body */ }
+  return new Error(`${label} -> ${res.status}${detail ? `: ${detail}` : ""}`);
+}
+
 export async function get(sub) {
   const res = await fetchWithTimeout(await selfPath(sub), { headers: authHeaders() });
-  if (!res.ok) throw new Error(`${sub} -> ${res.status}`);
+  if (!res.ok) throw await httpError(sub, res);
   return res.json();
 }
 export async function getText(sub) {
   const res = await fetchWithTimeout(await selfPath(sub), { headers: authHeaders() });
-  if (!res.ok) throw new Error(`${sub} -> ${res.status}`);
+  if (!res.ok) throw await httpError(sub, res);
   return res.text();
 }
 export async function post(sub, body) {
@@ -154,13 +162,13 @@ export async function post(sub, body) {
     headers: authHeaders({ "content-type": "application/json" }),
     body: JSON.stringify(body ?? {}),
   });
-  if (!res.ok) throw new Error(`${sub} -> ${res.status}`);
+  if (!res.ok) throw await httpError(sub, res);
   return res.json();
 }
 
 export async function rawGet(path) {
   const res = await fetchWithTimeout(`${BASE}${path}`, { headers: authHeaders() });
-  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  if (!res.ok) throw await httpError(path, res);
   return res.json();
 }
 export async function rawPost(path, body) {
@@ -169,12 +177,12 @@ export async function rawPost(path, body) {
     headers: authHeaders({ "content-type": "application/json" }),
     body: JSON.stringify(body ?? {}),
   });
-  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  if (!res.ok) throw await httpError(path, res);
   return res.json();
 }
 export async function rawDelete(path) {
   const res = await fetchWithTimeout(`${BASE}${path}`, { method: "DELETE", headers: authHeaders() });
-  if (!res.ok) throw new Error(`${path} -> ${res.status}`);
+  if (!res.ok) throw await httpError(path, res);
   return res.json();
 }
 
