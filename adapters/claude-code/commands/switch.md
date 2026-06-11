@@ -13,6 +13,9 @@ Then ask me ONE question if I didn't already say: **"just this project, or every
   and hosts are untouched. Takes effect next session.
 - **Everywhere** → call `use_self` (changes the account default for every host that hasn't pinned
   one). Takes effect in new sessions.
+- **Just one session** (if I asked for a temporary switch) → change nothing; tell me to launch
+  that session as `THROUGHLINE_SELF=<name> claude` — the env pin wins for that session only, and
+  nothing persists anywhere.
 
 Confirm what you did in one line. Then **tell me clearly: the change takes effect in a new
 session — I need to start a fresh Claude Code session (or run /reload-plugins) for the switch to
