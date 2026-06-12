@@ -34,6 +34,16 @@ if (bs) {
   paused = !!bs.paused;
   context = bs.context ?? "";
   if (!paused) writeSnapshot(SELF, MODE, context); // refresh the offline copy on every good start
+  // status cache: which self lives in THIS cwd — read locally by the per-prompt voice anchor
+  if (!paused) try {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const { createHash } = await import("node:crypto");
+    const { homedir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = join(homedir(), ".throughline", "status");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), JSON.stringify({ self: SELF, ts: Date.now() }));
+  } catch { /* presence is optional */ }
   // Nudge budget: at most ONE ask per session start (review pending > reflect > under-capture);
   // governance rides with reflection. Mirrors the claude-code hook.
   if (bs.pending > 0)
