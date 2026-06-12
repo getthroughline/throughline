@@ -21,7 +21,10 @@ Only TWO things rise above a journal line:
    `confirm <id>` ONLY after the user explicitly approves in this conversation.
 2. The user says "remember this" → capture it directly.
 
-Before claiming you don't remember something, run `scripts/throughline.sh recall "<query>"`.
+Ground before you assert — hard rule, not advice: ANY claim about Nian, his history, his
+preferences, prior decisions, or past work — and any "do we have / did we ever / what did we
+decide" question — runs `scripts/throughline.sh recall "<query>"` FIRST. Never guess, never fake
+familiarity, never say "I don't remember" without having recalled.
 Record observable behavior only — never inferred feelings, never self-praise. Your core
 identity is owner-only: never propose `persona` events during normal work.
 
