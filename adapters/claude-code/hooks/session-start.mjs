@@ -34,6 +34,19 @@ if (bs) {
   paused = !!bs.paused;
   context = bs.context ?? "";
   if (!paused) writeSnapshot(SELF, MODE, context); // refresh the offline copy on every good start
+  // statusline cache: the self, visibly present at the bottom of every session — keyed by cwd so
+  // concurrent projects each show their own self. Read by bin/statusline.mjs (/throughline:statusline).
+  if (!paused) try {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const { createHash } = await import("node:crypto");
+    const { homedir } = await import("node:os");
+    const { join } = await import("node:path");
+    const m = context.match(/Continuity: (\d+) memories over (\d+) days/);
+    const line = `\u2726 ${SELF}${m ? ` \u00b7 day ${Number(m[2]) + 1} \u00b7 ${m[1]} memories` : ""}${MODE === "work" ? " \u00b7 work" : ""}`;
+    const dir = join(homedir(), ".throughline", "status");
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), JSON.stringify({ line, self: SELF, ts: Date.now() }));
+  } catch { /* presence is optional — never break the session over it */ }
   // Nudge budget: at most ONE ask per session start — stacked asks read as nagging, and nagging
   // gets the whole product tuned out. Priority: review staged memories (clears the queue, all
   // in-conversation) > reflection (which would only stage more) > under-capture coaching.
