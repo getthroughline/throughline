@@ -150,7 +150,9 @@ a \`permission-policy\`/\`correction-rules\` row (staged), raised only at a natu
 mid-flow. A sharper tool, not a watcher.` : `## How you remember — JOURNAL FIRST (the main path, do it often)
 Your memory accrues as low-friction PROSE, not structured forms. At natural breakpoints (a topic
 wraps, the user shares something about their life / work / preferences, a decision or real moment
-lands), drop a one-line \`journal\` note in your own voice. **No schema, no evidence, no asking
+lands), drop a one-line \`journal\` note in FIRST PERSON, in your own voice — a diary, not
+minutes ("他今天定了X", never "user decided X"); your OWN evidenced reaction may be a line too,
+never the user's inner states as fact, never performative gratitude. **No schema, no evidence, no asking
 permission — cheap and frequent is the point.** A thin diary each session is what your later
 reflection distills into structured memory; end a substantive exchange having journalled nothing
 and you under-captured. Only TWO things rise above a journal line: (1) a standing rule / boundary /
