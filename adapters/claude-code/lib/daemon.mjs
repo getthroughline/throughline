@@ -1,6 +1,6 @@
 // Thin client for the Throughline API. Cloud-first: talks to the cloud by default; point
 // THROUGHLINE_URL to point at a self-hosted backend.
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -49,7 +49,6 @@ async function fetchWithTimeout(url, init = {}) {
 //      the work repo stays the work self, everywhere else stays the default
 //   3. the account's default_self
 // `selfSource()` reports which rule won, so the session hook can tell the user.
-import { existsSync, statSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 let cachedSelf, cachedSource;
 function projectSelf() {
@@ -70,6 +69,35 @@ function projectSelfUnsafe() {
     dir = parent;
   }
   return null;
+}
+
+function sessionStatusKeys() {
+  return [
+    ["claude", process.env.CLAUDE_SESSION_ID],
+    ["claude-code", process.env.CLAUDE_CODE_SESSION_ID],
+    ["claude-conversation", process.env.CLAUDE_CONVERSATION_ID],
+    ["claude-transcript", process.env.CLAUDE_TRANSCRIPT_PATH],
+  ].filter(([, v]) => v).map(([k, v]) => `${k}-${String(v).replace(/[^\w.-]/g, "_")}`);
+}
+
+function sessionStatusSelf() {
+  const dir = join(homedir(), ".throughline", "status");
+  for (const key of sessionStatusKeys()) {
+    try {
+      const p = join(dir, `${key}.json`);
+      const st = statSync(p);
+      if (Date.now() - st.mtimeMs > 7 * 86_400_000) continue;
+      const status = JSON.parse(readFileSync(p, "utf8"));
+      if (typeof status?.self === "string" && status.self) return status.self;
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+function pluginRuntime() {
+  return /\/\.claude\/plugins\/cache\/throughline\/throughline\//.test(process.cwd());
 }
 export function hasKey() { return !!apiKey(); }
 export function selfSource() { return cachedSource ?? "default"; }
@@ -110,6 +138,9 @@ export async function self() {
   if (process.env.THROUGHLINE_SELF) { cachedSource = "env"; return (cachedSelf = process.env.THROUGHLINE_SELF); }
   const proj = projectSelf();
   if (proj) { cachedSource = "project"; return (cachedSelf = proj); }
+  const status = sessionStatusSelf();
+  if (status) { cachedSource = "session-status"; return (cachedSelf = status); }
+  if (pluginRuntime()) { cachedSource = "unbound-plugin"; return (cachedSelf = "assistant"); }
   try {
     const res = await fetchWithTimeout(`${BASE}/config`, { headers: authHeaders() });
     if (res.ok) {
@@ -128,7 +159,7 @@ export async function self() {
  * deliberate pins and win; return false so the caller can tell the user the session stays pinned.
  */
 export function rebindSelf(name) {
-  if (cachedSource === "env" || cachedSource === "project") return false;
+  if (cachedSource === "env" || cachedSource === "project" || cachedSource === "session-status" || cachedSource === "unbound-plugin") return false;
   cachedSelf = name || undefined; // undefined → next self() re-resolves from account default
   if (name) cachedSource = "account-default";
   return true;

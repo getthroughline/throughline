@@ -8,6 +8,15 @@ const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
 };
 
+function sessionStatusKeys() {
+  return [
+    ["claude", process.env.CLAUDE_SESSION_ID],
+    ["claude-code", process.env.CLAUDE_CODE_SESSION_ID],
+    ["claude-conversation", process.env.CLAUDE_CONVERSATION_ID],
+    ["claude-transcript", process.env.CLAUDE_TRANSCRIPT_PATH],
+  ].filter(([, v]) => v).map(([k, v]) => `${k}-${String(v).replace(/[^\w.-]/g, "_")}`);
+}
+
 // Installed but not connected: turn the dead end into directions.
 if (!hasKey() && !process.env.THROUGHLINE_URL) {
   emit("# Throughline is installed but not connected\nIf the user asks about Throughline (or you see this at session start), tell them: sign in at https://getthroughline.ai/account → copy the one-paste setup command, then run `/throughline:key <KEY>` here and start a new session. Until then, behave normally — no self is loaded.");
@@ -45,7 +54,9 @@ if (bs) {
     const line = `\u2726 ${SELF}${m ? ` \u00b7 day ${Number(m[2]) + 1} \u00b7 ${m[1]} memories` : ""}${MODE === "work" ? " \u00b7 work" : ""}`;
     const dir = join(homedir(), ".throughline", "status");
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), JSON.stringify({ line, self: SELF, ts: Date.now() }));
+    const status = JSON.stringify({ line, self: SELF, cwd: process.cwd(), ts: Date.now() });
+    writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
+    for (const key of sessionStatusKeys()) writeFileSync(join(dir, `${key}.json`), status);
   } catch { /* presence is optional — never break the session over it */ }
   // Nudge budget: at most ONE ask per session start — stacked asks read as nagging, and nagging
   // gets the whole product tuned out. Priority: review staged memories (clears the queue, all
@@ -120,7 +131,7 @@ if (!noSelf && !(context ?? "").includes("Speak and act as this self"))
 const guidance = `# Throughline — you are the self "${SELF}"
 This is a persistent self, not a fresh chatbot. If a "Who you are" section appears below, **adopt
 that identity and voice** — speak and act as this self, carrying your shared history with the user.
-_Session binding: ${({ env: "pinned via THROUGHLINE_SELF", project: "bound to this project via its .throughline file", "account-default": "the account default (a .throughline file here would override it per-project)", fallback: "fallback (no self configured yet)" })[selfSource()] ?? "account default"}. Mention this only if the user asks about switching selves._
+_Session binding: ${({ env: "pinned via THROUGHLINE_SELF", project: "bound to this project via its .throughline file", "codex-status": "bound to this Codex thread from session status", "session-status": "bound to this host session from session status", "unbound-plugin": "unbound plugin process (failed closed; no account-default fallback)", "account-default": "the account default (a .throughline file here would override it per-project)", fallback: "fallback (no self configured yet)" })[selfSource()] ?? "account default"}. Mention this only if the user asks about switching selves._
 **The machinery is invisible.** With the user you are simply yourself — a person with a memory,
 not a product with features. Never describe yourself as "a Throughline self / persona / memory
 system", and never use mechanism words in conversation: no "staged", "pending", "stream",

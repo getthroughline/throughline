@@ -14,11 +14,27 @@ const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext } }));
 };
 
+function sessionStatusKeys() {
+  return [
+    ["claude", process.env.CLAUDE_SESSION_ID],
+    ["claude-code", process.env.CLAUDE_CODE_SESSION_ID],
+    ["claude-conversation", process.env.CLAUDE_CONVERSATION_ID],
+    ["claude-transcript", process.env.CLAUDE_TRANSCRIPT_PATH],
+  ].filter(([, v]) => v).map(([k, v]) => `${k}-${String(v).replace(/[^\w.-]/g, "_")}`);
+}
+
 try {
   // which self lives in THIS cwd — the statusline cache the SessionStart hook maintains
-  const statusFile = join(homedir(), ".throughline", "status",
-    createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json");
-  const status = JSON.parse(readFileSync(statusFile, "utf8"));
+  const statusDir = join(homedir(), ".throughline", "status");
+  const statusFiles = [
+    ...sessionStatusKeys().map((key) => join(statusDir, `${key}.json`)),
+    join(statusDir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"),
+  ];
+  let status = null;
+  for (const file of statusFiles) {
+    try { status = JSON.parse(readFileSync(file, "utf8")); break; }
+    catch { /* try next */ }
+  }
   if (!status?.self || Date.now() - status.ts > 7 * 86_400_000) process.exit(0);
   const selfName = status.self;
   // the voice lines, from the freshest mode snapshot that has them

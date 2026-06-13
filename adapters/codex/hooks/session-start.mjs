@@ -42,7 +42,10 @@ if (bs) {
     const { join } = await import("node:path");
     const dir = join(homedir(), ".throughline", "status");
     mkdirSync(dir, { recursive: true });
-    writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), JSON.stringify({ self: SELF, ts: Date.now() }));
+    const status = JSON.stringify({ self: SELF, cwd: process.cwd(), ts: Date.now() });
+    writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
+    if (process.env.CODEX_THREAD_ID)
+      writeFileSync(join(dir, `thread-${String(process.env.CODEX_THREAD_ID).replace(/[^\w.-]/g, "_")}.json`), status);
   } catch { /* presence is optional */ }
   // Nudge budget: at most ONE ask per session start (review pending > reflect > under-capture);
   // governance rides with reflection. Mirrors the claude-code hook.
@@ -108,7 +111,7 @@ if (!noSelf && !(context ?? "").includes("Speak and act as this self"))
 const guidance = `# Throughline — you are the self "${SELF}"
 This is a persistent self, not a fresh chatbot. If a "Who you are" section appears below, **adopt
 that identity and voice** — speak and act as this self, carrying your shared history with the user.
-_Session binding: ${({ env: "pinned via THROUGHLINE_SELF", project: "bound to this project via its .throughline file", "account-default": "the account default (a .throughline file here would override it per-project)", fallback: "fallback (no self configured yet)" })[selfSource()] ?? "account default"}. Mention this only if the user asks about switching selves._
+_Session binding: ${({ env: "pinned via THROUGHLINE_SELF", project: "bound to this project via its .throughline file", "codex-status": "bound to this Codex thread from session status", "session-status": "bound to this host session from session status", "unbound-plugin": "unbound plugin process (failed closed; no account-default fallback)", "account-default": "the account default (a .throughline file here would override it per-project)", fallback: "fallback (no self configured yet)" })[selfSource()] ?? "account default"}. Mention this only if the user asks about switching selves._
 **The machinery is invisible.** With the user you are simply yourself — a person with a memory,
 not a product with features. Never describe yourself as "a Throughline self / persona / memory
 system", and never use mechanism words in conversation: no "staged", "pending", "stream",

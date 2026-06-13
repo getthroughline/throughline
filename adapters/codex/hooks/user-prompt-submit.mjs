@@ -23,9 +23,16 @@ if (sessionMode("work") === "off") process.exit(0);
 let anchor = "";
 let cachedSelfName = null;
 try {
-  const statusFile = join(homedir(), ".throughline", "status",
-    createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json");
-  const status = JSON.parse(readFileSync(statusFile, "utf8"));
+  const statusDir = join(homedir(), ".throughline", "status");
+  const statusFiles = [
+    process.env.CODEX_THREAD_ID ? join(statusDir, `thread-${String(process.env.CODEX_THREAD_ID).replace(/[^\w.-]/g, "_")}.json`) : "",
+    join(statusDir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"),
+  ].filter(Boolean);
+  let status = null;
+  for (const file of statusFiles) {
+    try { status = JSON.parse(readFileSync(file, "utf8")); break; }
+    catch { /* try next */ }
+  }
   if (status?.self && Date.now() - status.ts < 7 * 86_400_000) {
     cachedSelfName = status.self;
     let lines = "";
