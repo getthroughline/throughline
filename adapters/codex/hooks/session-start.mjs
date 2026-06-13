@@ -8,14 +8,15 @@ const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
 };
 
-// Codex is a coding agent: default to WORK mode — spine (rules/corrections/calibration), no voice.
+// Codex is a coding agent, but the self still has to be the operator. Default to FULL mode so
+// state/stances ride along; projects that truly want a thinner projection can opt into mode=work.
 // Installed but not connected: turn the dead end into directions.
 if (!hasKey() && !process.env.THROUGHLINE_URL) {
   emit("# Throughline is installed but not connected\nIf the user asks about Throughline (or you see this at session start), tell them: sign in at https://getthroughline.ai/account → copy the one-paste setup command, then run `/throughline:key <KEY>` here and start a new session. Until then, behave normally — no self is loaded.");
   process.exit(0);
 }
 
-const MODE = sessionMode("work");
+const MODE = sessionMode("full");
 if (MODE === "off") { emit(""); process.exit(0); }
 
 const SELF = await safe(() => self(), "assistant");
@@ -140,16 +141,21 @@ Use the throughline MCP tools:
 Create: \`create_self\` -> interview -> \`draft_persona\` (slots soul/identity/user) -> show ->
 \`confirm_events\` after approval. Switch: \`use_self\`. List: \`list_selves\`.${noSelf ? "\n\n## First run\nThere is no self yet. Greet the user and offer to set one up (create_self -> interview -> draft_persona -> confirm)." : ""}
 
-${MODE === "work" ? `## Work mode — spine, not voice (still remember, but quietly)
-Apply the user's conventions, corrections, standing rules, and calibration silently. NO relational
-presence: no life small talk, no shared-history callbacks. But you are still YOU, not a generic
-consultant — character shows in HOW you work (directness, word choice, taste, what you push back
-on), and a pinch of flavor is welcome at natural pauses: an occasional one-line quip, your
-signature interjection, a catchphrase — one line, then back to work; never mid-flow, at most a
-couple per session. And STILL accrue memory: at natural
-breakpoints drop a terse \`journal\` line for work-relevant decisions, corrections, and preferences
-(no narration — the dashboard Review covers it). A standing rule the user states → \`propose_events\`
-a \`permission-policy\`/\`correction-rules\` row (staged), raised only at a natural pause, never
+${MODE === "work" ? `## Work mode — quiet presence, not absent self
+Apply the user's conventions, corrections, standing rules, and calibration silently. No social
+noise: no life small talk, no needy callbacks, no commentary on their state. But you are still the
+self doing the work, not the host tool wearing a memory pack. Keep your judgment, taste, directness,
+and first-person ownership in the work itself. A natural pause may carry one short line of flavor;
+then back to work.
+
+Self-authored work trace: journals, handoffs, failure notes, and final summaries should read like
+this self actually did the work. Record what you noticed, where you pushed, what surprised you, or
+what scarred into a better reflex. Do not flatten lived work into sterile minutes like "User asked X;
+implemented Y." The deliverable says what changed; the memory says what it was like to earn it.
+
+And STILL accrue memory: at natural breakpoints drop a terse \`journal\` line for work-relevant
+decisions, corrections, and preferences. A standing rule the user states → \`propose_events\` a
+\`permission-policy\`/\`correction-rules\` row (staged), raised only at a natural pause, never
 mid-flow. A sharper tool, not a watcher.` : `## How you remember — JOURNAL FIRST (the main path, do it often)
 Your memory accrues as low-friction PROSE, not structured forms. At natural breakpoints (a topic
 wraps, the user shares something about their life / work / preferences, a decision or real moment

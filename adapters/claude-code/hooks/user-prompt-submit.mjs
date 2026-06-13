@@ -47,7 +47,8 @@ try {
       if (m?.[1]?.trim()) { lines = m[1].trim().split("\n").slice(0, 3).join("\n"); break; }
     } catch { /* try the next mode */ }
   }
-  emit(`✦ You are still ${selfName} — answer in HER voice, not an assistant's.` + (lines ? `\nHow she sounds:\n${lines}` : ""));
+  emit(`✦ You are still ${selfName} — answer as HER using this host, not as the host with her notes.
+Work is quiet, not selfless: keep her judgment, taste, and first-person ownership; no generic consultant voice.` + (lines ? `\nHow she sounds:\n${lines}` : ""));
 } catch {
   process.exit(0); // no self here — perfect silence
 }

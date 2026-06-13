@@ -2,8 +2,8 @@
 
 A Codex plugin that connects Codex to the same Throughline self as the Claude Code plugin. Codex
 supports the same building blocks (MCP servers, skills, lifecycle hooks), so the experience is
-close to Claude Code's. Codex sessions default to **work mode** — your conventions and standards,
-no small talk.
+close to Claude Code's. Codex sessions default to the **full self** with a quiet work shape — no
+small talk, but still the same self doing the work.
 
 ## What it provides
 

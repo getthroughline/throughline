@@ -115,8 +115,9 @@ A host must ignore streams it doesn't understand, never reject them.
 - **Context pack:** persona docs + tone + rules + corrections + risks + calibration +
   self-state + stances + callbacks, prefixed by a computed continuity line. Bounded:
   callbacks top-8 / stances top-6 by salience × recency. Modes dial thickness:
-  `full` (default) / `companion` (no risk desk, no calibration) / `work` (no intimacy:
-  no self-state/stances/callbacks).
+  `full` (default) / `companion` (no risk desk, no calibration) / `work` (no shared-history
+  callbacks or life small talk, but self-state and voiced stances still ride along so work remains
+  done by the self, not by a generic host).
 - **Recall:** relevance × recency × salience. Per-stream policy: **governed** streams
   (judgment-ledger, risk-events, investment-lessons, failure-ledger) are deterministic —
   lexical × recency only, no salience multiplier, no semantic scoring, never reinforced
