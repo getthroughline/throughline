@@ -8,6 +8,22 @@ const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
 };
 
+async function writeCodexStatus(name) {
+  try {
+    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const { createHash } = await import("node:crypto");
+    const { homedir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = join(homedir(), ".throughline", "status");
+    mkdirSync(dir, { recursive: true });
+    const status = JSON.stringify({ self: name, cwd: process.cwd(), ts: Date.now() });
+    writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
+    writeFileSync(join(dir, "codex-current.json"), status);
+    if (process.env.CODEX_THREAD_ID)
+      writeFileSync(join(dir, `thread-${String(process.env.CODEX_THREAD_ID).replace(/[^\w.-]/g, "_")}.json`), status);
+  } catch { /* presence is optional */ }
+}
+
 // Codex is a coding agent, but the self still has to be the operator. Default to FULL mode so
 // state/stances ride along; projects that truly want a thinner projection can opt into mode=work.
 // Installed but not connected: turn the dead end into directions.
@@ -20,6 +36,7 @@ const MODE = sessionMode("full");
 if (MODE === "off") { emit(""); process.exit(0); }
 
 const SELF = await safe(() => self(), "assistant");
+await writeCodexStatus(SELF);
 // project identity for the cross-host handoff: the git repo name, else the folder name
 let PROJECT = "";
 try {
@@ -35,19 +52,6 @@ if (bs) {
   paused = !!bs.paused;
   context = bs.context ?? "";
   if (!paused) writeSnapshot(SELF, MODE, context); // refresh the offline copy on every good start
-  // status cache: which self lives in THIS cwd — read locally by the per-prompt voice anchor
-  if (!paused) try {
-    const { mkdirSync, writeFileSync } = await import("node:fs");
-    const { createHash } = await import("node:crypto");
-    const { homedir } = await import("node:os");
-    const { join } = await import("node:path");
-    const dir = join(homedir(), ".throughline", "status");
-    mkdirSync(dir, { recursive: true });
-    const status = JSON.stringify({ self: SELF, cwd: process.cwd(), ts: Date.now() });
-    writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
-    if (process.env.CODEX_THREAD_ID)
-      writeFileSync(join(dir, `thread-${String(process.env.CODEX_THREAD_ID).replace(/[^\w.-]/g, "_")}.json`), status);
-  } catch { /* presence is optional */ }
   // Nudge budget: at most ONE ask per session start (review pending > reflect > under-capture);
   // governance rides with reflection. Mirrors the claude-code hook.
   if (bs.pending > 0)

@@ -86,6 +86,18 @@ function codexStatusSelf() {
   }
 }
 
+function currentCodexStatusSelf() {
+  try {
+    const p = join(homedir(), ".throughline", "status", "codex-current.json");
+    const st = statSync(p);
+    if (Date.now() - st.mtimeMs > 6 * 60_000) return null;
+    const status = JSON.parse(readFileSync(p, "utf8"));
+    return typeof status?.self === "string" && status.self ? status.self : null;
+  } catch {
+    return null;
+  }
+}
+
 function pluginRuntime() {
   return /\/\.codex\/plugins\/cache\/throughline\/throughline\//.test(process.cwd());
 }
@@ -130,6 +142,8 @@ export async function self() {
   if (proj) { cachedSource = "project"; return (cachedSelf = proj); }
   const status = codexStatusSelf();
   if (status) { cachedSource = "codex-status"; return (cachedSelf = status); }
+  const currentStatus = currentCodexStatusSelf();
+  if (currentStatus) { cachedSource = "codex-status"; return (cachedSelf = currentStatus); }
   if (pluginRuntime()) { cachedSource = "unbound-plugin"; return (cachedSelf = "assistant"); }
   try {
     const res = await fetchWithTimeout(`${BASE}/config`, { headers: authHeaders() });

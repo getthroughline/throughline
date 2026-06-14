@@ -16,8 +16,22 @@ const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext } }));
 };
 
+async function writeCodexStatus(name) {
+  try {
+    const statusDir = join(homedir(), ".throughline", "status");
+    mkdirSync(statusDir, { recursive: true });
+    const status = JSON.stringify({ self: name, cwd: process.cwd(), ts: Date.now() });
+    writeFileSync(join(statusDir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
+    writeFileSync(join(statusDir, "codex-current.json"), status);
+    if (process.env.CODEX_THREAD_ID)
+      writeFileSync(join(statusDir, `thread-${String(process.env.CODEX_THREAD_ID).replace(/[^\w.-]/g, "_")}.json`), status);
+  } catch { /* presence is optional */ }
+}
+
 if (!hasKey() && !process.env.THROUGHLINE_URL) process.exit(0);
 if (sessionMode("work") === "off") process.exit(0);
+
+await writeCodexStatus(await safe(() => self(), "assistant"));
 
 // ---- 1. the voice anchor: local files only (status cache → snapshot), zero network ----
 let anchor = "";
