@@ -48,7 +48,7 @@ function liveClock(tz, offsetHours) {
         minute: String(s.getUTCMinutes()).padStart(2, "0") };
     } else return null;
     const hr = Number(p.hour);
-    const phase = hr < 5 ? "deep night" : hr < 11 ? "morning" : hr < 14 ? "midday" : hr < 18 ? "afternoon" : hr < 23 ? "evening" : "deep night";
+    const phase = hr < 5 ? "deep night" : hr < 11 ? "morning" : hr < 14 ? "midday" : hr < 18 ? "afternoon" : hr < 22 ? "evening" : "late night"; // 22–23 is "late night", only 0–4 is "deep night" (matches server temporalPhase)
     return `${p.weekday} ${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} (${phase})`;
   } catch { return null; }
 }
