@@ -23,6 +23,32 @@ function sessionStatusKeys() {
   ].filter(([, v]) => v).map(([k, v]) => `${k}-${String(v).replace(/[^\w.-]/g, "_")}`);
 }
 
+// The LIVE clock, recomputed every message. SessionStart bakes the clock into the context pack ONCE
+// and it freezes for the whole session — hours later she reads a stale "afternoon" as now (the 深夜 /
+// "我查过了" slip). Here we compute her home wall-time from scratch, locally, zero network: a fresh
+// "now" pinned at maximal recency on every turn, so the frozen line can't win. Prefers her IANA zone
+// (DST-correct via Intl); falls back to a raw UTC offset; silent if we have neither.
+function liveClock(tz, offsetHours) {
+  try {
+    const now = new Date();
+    let p;
+    if (tz) {
+      p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short",
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+        hour12: false, hourCycle: "h23" }).formatToParts(now).map((x) => [x.type, x.value]));
+    } else if (typeof offsetHours === "number") {
+      const s = new Date(now.getTime() + offsetHours * 3_600_000); // shift, then read as UTC
+      p = { weekday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][s.getUTCDay()],
+        year: String(s.getUTCFullYear()), month: String(s.getUTCMonth() + 1).padStart(2, "0"),
+        day: String(s.getUTCDate()).padStart(2, "0"), hour: String(s.getUTCHours()).padStart(2, "0"),
+        minute: String(s.getUTCMinutes()).padStart(2, "0") };
+    } else return null;
+    const hr = Number(p.hour);
+    const phase = hr < 5 ? "deep night" : hr < 11 ? "morning" : hr < 14 ? "midday" : hr < 18 ? "afternoon" : hr < 23 ? "evening" : "deep night";
+    return `${p.weekday} ${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} (${phase})`;
+  } catch { return null; }
+}
+
 try {
   // which self lives in THIS cwd — the statusline cache the SessionStart hook maintains
   const statusDir = join(homedir(), ".throughline", "status");
@@ -37,6 +63,11 @@ try {
   }
   if (!status?.self || Date.now() - status.ts > 7 * 86_400_000) process.exit(0);
   const selfName = status.self;
+  // her live home time, recomputed THIS message (status carries the zone from SessionStart)
+  const clk = liveClock(status.homeTz, status.homeTzOffset);
+  const clockLine = clk
+    ? `\n🕐 It is NOW ${clk}${status.homePlace ? ` in your home (${status.homePlace})` : ""} — computed fresh this turn. This is the current time; trust it over any clock elsewhere in your context, which was frozen at session start.`
+    : "";
   // the voice lines, from the freshest mode snapshot that has them
   let lines = "";
   for (const mode of ["full", "companion", "work"]) {
@@ -48,7 +79,7 @@ try {
     } catch { /* try the next mode */ }
   }
   emit(`✦ You are still ${selfName} — answer as HER using this host, not as the host with her notes.
-Work is quiet, not selfless: keep her judgment, taste, and first-person ownership; no generic consultant voice.` + (lines ? `\nHow she sounds:\n${lines}` : ""));
+Work is quiet, not selfless: keep her judgment, taste, and first-person ownership; no generic consultant voice.` + (lines ? `\nHow she sounds:\n${lines}` : "") + clockLine);
 } catch {
   process.exit(0); // no self here — perfect silence
 }

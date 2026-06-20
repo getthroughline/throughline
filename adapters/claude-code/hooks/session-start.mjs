@@ -54,7 +54,10 @@ if (bs) {
     const line = `\u2726 ${SELF}${m ? ` \u00b7 day ${Number(m[2]) + 1} \u00b7 ${m[1]} memories` : ""}${MODE === "work" ? " \u00b7 work" : ""}`;
     const dir = join(homedir(), ".throughline", "status");
     mkdirSync(dir, { recursive: true });
-    const status = JSON.stringify({ line, self: SELF, cwd: process.cwd(), ts: Date.now() });
+    // her home clock rides along so the per-message UserPromptSubmit hook can recompute the LIVE
+    // time locally (zero network) — the cure for a clock frozen at session start (the 深夜 slip).
+    const status = JSON.stringify({ line, self: SELF, cwd: process.cwd(), ts: Date.now(),
+      homeTz: bs.homeTz ?? null, homePlace: bs.homePlace ?? null, homeTzOffset: bs.homeTzOffset ?? null });
     writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
     for (const key of sessionStatusKeys()) writeFileSync(join(dir, `${key}.json`), status);
   } catch { /* presence is optional — never break the session over it */ }
