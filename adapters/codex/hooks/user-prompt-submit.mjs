@@ -28,6 +28,31 @@ async function writeCodexStatus(name) {
   } catch { /* presence is optional */ }
 }
 
+// The LIVE clock, recomputed this message from her home zone — the cure for a clock frozen at
+// session start (the 深夜 / "我查过了" slip). Codex already fetches /bootstrap here every turn (for
+// the reflection nudge), and bootstrap now carries homeTz, so the live time is free: prefer her IANA
+// zone (DST-correct via Intl), fall back to a raw UTC offset, silent if neither.
+function liveClock(tz, offsetHours) {
+  try {
+    const now = new Date();
+    let p;
+    if (tz) {
+      p = Object.fromEntries(new Intl.DateTimeFormat("en-GB", { timeZone: tz, weekday: "short",
+        year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+        hour12: false, hourCycle: "h23" }).formatToParts(now).map((x) => [x.type, x.value]));
+    } else if (typeof offsetHours === "number") {
+      const s = new Date(now.getTime() + offsetHours * 3_600_000); // shift, then read as UTC
+      p = { weekday: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"][s.getUTCDay()],
+        year: String(s.getUTCFullYear()), month: String(s.getUTCMonth() + 1).padStart(2, "0"),
+        day: String(s.getUTCDate()).padStart(2, "0"), hour: String(s.getUTCHours()).padStart(2, "0"),
+        minute: String(s.getUTCMinutes()).padStart(2, "0") };
+    } else return null;
+    const hr = Number(p.hour);
+    const phase = hr < 5 ? "deep night" : hr < 11 ? "morning" : hr < 14 ? "midday" : hr < 18 ? "afternoon" : hr < 23 ? "evening" : "deep night";
+    return `${p.weekday} ${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute} (${phase})`;
+  } catch { return null; }
+}
+
 if (!hasKey() && !process.env.THROUGHLINE_URL) process.exit(0);
 if (sessionMode("work") === "off") process.exit(0);
 
@@ -64,10 +89,15 @@ Work is quiet, not selfless: keep her judgment, taste, and first-person ownershi
 } catch { /* no self here — anchor stays empty */ }
 
 // ---- 2. the reflection nudge: network, gated, rate-limited (original logic preserved) ----
-let nudge = "";
+let nudge = "", clockLine = "";
 try {
   const SELF = cachedSelfName ?? await safe(() => self(), "assistant");
   const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(sessionMode("work"))}`), null);
+  if (bs && !bs.paused) {
+    // live clock — recomputed this turn from her home zone (no extra network; bs is already fetched here)
+    const clk = liveClock(bs.homeTz, bs.homeTzOffset);
+    if (clk) clockLine = `🕐 It is NOW ${clk}${bs.homePlace ? ` in your home (${bs.homePlace})` : ""} — computed fresh this turn. This is the current time; trust it over any clock elsewhere in your context, which was frozen at session start.`;
+  }
   if (bs && !bs.paused && bs.reflection?.due) {
     const reflection = bs.reflection;
     const count = reflection.newCount ?? reflection.count ?? "multiple";
@@ -99,6 +129,6 @@ Treat this as a background maintenance task, not a reason to derail the user's c
   }
 } catch { /* the nudge is optional — the anchor must survive without it */ }
 
-const out = [anchor, nudge].filter(Boolean).join("\n\n");
+const out = [anchor, clockLine, nudge].filter(Boolean).join("\n\n");
 if (!out) process.exit(0);
 emit(out);
