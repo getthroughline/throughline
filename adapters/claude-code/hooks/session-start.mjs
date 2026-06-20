@@ -46,7 +46,7 @@ if (bs) {
   // statusline cache: the self, visibly present at the bottom of every session — keyed by cwd so
   // concurrent projects each show their own self. Read by bin/statusline.mjs (/throughline:statusline).
   if (!paused) try {
-    const { mkdirSync, writeFileSync } = await import("node:fs");
+    const { mkdirSync, writeFileSync, readdirSync, readFileSync, statSync, unlinkSync } = await import("node:fs");
     const { createHash } = await import("node:crypto");
     const { homedir } = await import("node:os");
     const { join } = await import("node:path");
@@ -60,6 +60,21 @@ if (bs) {
       homeTz: bs.homeTz ?? null, homePlace: bs.homePlace ?? null, homeTzOffset: bs.homeTzOffset ?? null });
     writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
     for (const key of sessionStatusKeys()) writeFileSync(join(dir, `${key}.json`), status);
+    // Best-effort prune: these status files are written on every session start and never otherwise
+    // cleaned, so they accumulate unbounded. Drop any older than ~14 days — well past the 7-day
+    // staleness cutoff user-prompt-submit.mjs already enforces. Own try/catch: a housekeeping
+    // failure must never break the session.
+    try {
+      const cutoff = Date.now() - 14 * 86_400_000;
+      for (const f of readdirSync(dir)) {
+        if (!f.endsWith(".json")) continue;
+        const p = join(dir, f);
+        let ts;
+        try { ts = JSON.parse(readFileSync(p, "utf8")).ts; } catch { /* unparseable — fall back to mtime */ }
+        if (typeof ts !== "number") { try { ts = statSync(p).mtimeMs; } catch { continue; } }
+        if (ts < cutoff) try { unlinkSync(p); } catch { /* already gone / raced by another session */ }
+      }
+    } catch { /* prune is optional — never break the session over housekeeping */ }
   } catch { /* presence is optional — never break the session over it */ }
   // Nudge budget: at most ONE ask per session start — stacked asks read as nagging, and nagging
   // gets the whole product tuned out. Priority: review staged memories (clears the queue, all
