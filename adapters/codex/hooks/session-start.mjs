@@ -24,6 +24,29 @@ async function writeCodexStatus(name) {
   } catch { /* presence is optional */ }
 }
 
+// Best-effort prune: status files are written every session start (and every turn) but only ever
+// overwritten by name — thread-*.json accrue one per Codex thread and are never cleaned, so they
+// pile up unbounded. Drop any older than ~14 days — well past the 7-day staleness cutoff the reader
+// in user-prompt-submit.mjs enforces. Own try/catch so housekeeping can never break the session.
+// Called once at session start — NOT from writeCodexStatus, which runs on every turn.
+async function pruneCodexStatus() {
+  try {
+    const { readdirSync, readFileSync, statSync, unlinkSync } = await import("node:fs");
+    const { homedir } = await import("node:os");
+    const { join } = await import("node:path");
+    const dir = join(homedir(), ".throughline", "status");
+    const cutoff = Date.now() - 14 * 86_400_000;
+    for (const f of readdirSync(dir)) {
+      if (!f.endsWith(".json")) continue;
+      const p = join(dir, f);
+      let ts;
+      try { ts = JSON.parse(readFileSync(p, "utf8")).ts; } catch { /* unparseable — fall back to mtime */ }
+      if (typeof ts !== "number") { try { ts = statSync(p).mtimeMs; } catch { continue; } }
+      if (ts < cutoff) try { unlinkSync(p); } catch { /* already gone / raced by another session */ }
+    }
+  } catch { /* prune is optional — never break the session over housekeeping */ }
+}
+
 // Codex is a coding agent, but the self still has to be the operator. Default to FULL mode so
 // state/stances ride along; projects that truly want a thinner projection can opt into mode=work.
 // Installed but not connected: turn the dead end into directions.
@@ -37,6 +60,7 @@ if (MODE === "off") { emit(""); process.exit(0); }
 
 const SELF = await safe(() => self(), "assistant");
 await writeCodexStatus(SELF);
+await pruneCodexStatus(); // best-effort housekeeping; session-start only, never the every-turn path
 // project identity for the cross-host handoff: the git repo name, else the folder name
 let PROJECT = "";
 try {
