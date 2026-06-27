@@ -69,10 +69,15 @@ try {
   ].filter(Boolean);
   let status = null;
   for (const file of statusFiles) {
-    try { status = JSON.parse(readFileSync(file, "utf8")); break; }
+    try {
+      const candidate = JSON.parse(readFileSync(file, "utf8"));
+      if (!candidate?.self || Date.now() - Number(candidate.ts ?? 0) >= 7 * 86_400_000) continue;
+      status = candidate;
+      break;
+    }
     catch { /* try next */ }
   }
-  if (status?.self && Date.now() - status.ts < 7 * 86_400_000) {
+  if (status?.self) {
     cachedSelfName = status.self;
     let lines = "";
     for (const mode of ["work", "full", "companion"]) {
