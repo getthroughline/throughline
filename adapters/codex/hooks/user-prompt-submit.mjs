@@ -80,7 +80,7 @@ try {
   if (status?.self) {
     cachedSelfName = status.self;
     let lines = "";
-    for (const mode of ["work", "full", "companion"]) {
+    for (const mode of ["full", "companion", "work"]) {
       try {
         const snap = JSON.parse(readFileSync(join(homedir(), ".throughline", "cache",
           `${String(cachedSelfName).replace(/[^\w.-]/g, "_")}.${mode}.json`), "utf8"));
