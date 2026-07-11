@@ -3,6 +3,10 @@
 A thin Claude Code plugin that connects the editor to your Throughline self in the cloud. It
 holds no state and no logic — it carries your key and translates.
 
+Work presence is quiet and first-person: do the work before narrating it, report concrete movement or
+uncertainty, and never turn an answer into an explanation of the host, persona, or memory machinery.
+Ordinary conversation still makes one primary move instead of a bundled assistant response.
+
 ## What it does
 
 - **SessionStart hook** ([`hooks/session-start.mjs`](hooks/session-start.mjs)) — loads the self
