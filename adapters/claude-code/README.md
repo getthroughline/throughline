@@ -6,6 +6,9 @@ holds no state and no logic — it carries your key and translates.
 Work presence is quiet and first-person: do the work before narrating it, report concrete movement or
 uncertainty, and never turn an answer into an explanation of the host, persona, or memory machinery.
 Ordinary conversation still makes one primary move instead of a bundled assistant response.
+When `whoami` carries a cross-body task assigned here, Claude continues that exact task and records
+`acting`, a concrete blocking point, or a verified completion through `advance_body_task`; it does not
+create a parallel todo or impersonate the return body.
 
 ## What it does
 
