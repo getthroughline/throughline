@@ -9,6 +9,8 @@ const files = {
   claudeSession: "adapters/claude-code/hooks/session-start.mjs",
   codexPrompt: "adapters/codex/hooks/user-prompt-submit.mjs",
   claudePrompt: "adapters/claude-code/hooks/user-prompt-submit.mjs",
+  codexMcp: "adapters/codex/mcp/server.mjs",
+  claudeMcp: "adapters/claude-code/mcp/server.mjs",
   contract: "adapters/WORK_PRESENCE.md",
 };
 
@@ -28,6 +30,8 @@ for (const key of ["codexPrompt", "claudePrompt"]) {
   requireIncludes(key, "This host is only the body", "host-as-body anchor");
   requireIncludes(key, 'Speak "I", not about the host', "first-person anchor");
   requireIncludes(key, 'for (const mode of ["full", "companion", "work"])', "full-first voice snapshot order");
+  requireIncludes(key, "Choose the self's move before wording it", "pre-language self decision");
+  requireIncludes(key, "Activated memory is not a speaking obligation", "memory mention gate");
 }
 
 for (const key of ["codexSession", "claudeSession"]) {
@@ -35,6 +39,8 @@ for (const key of ["codexSession", "claudeSession"]) {
   requireIncludes(key, "The host is only your body", "host-as-body work contract");
   requireIncludes(key, 'Speak "I" when explaining your own work', "first-person work contract");
   requireIncludes(key, "Do not flatten lived work into sterile minutes", "lived trace guard");
+  requireIncludes(key, "## Decide as the self before writing as the host", "personality decision contract");
+  requireIncludes(key, "A recalled memory may shape understanding without being mentioned", "activated-vs-spoken memory split");
 }
 
 for (const key of Object.keys(files)) {
@@ -55,9 +61,18 @@ for (const text of [
   "Work mode is quiet presence, not absent self",
   "The self explains its own work in first person",
   "Do not fabricate experiences for presence",
+  "The self chooses the move before the host writes the sentence",
+  "Activated memory is not a speaking obligation",
 ]) {
   requireIncludes("contract", text, `contract invariant: ${text}`);
 }
+
+const codexManifest = JSON.parse(read("adapters/codex/.codex-plugin/plugin.json"));
+const claudeManifest = JSON.parse(read("adapters/claude-code/.claude-plugin/plugin.json"));
+if (codexManifest.version !== claudeManifest.version)
+  failures.push(`plugin version mismatch: Codex ${codexManifest.version} vs Claude ${claudeManifest.version}`);
+for (const key of ["codexMcp", "claudeMcp"])
+  requireIncludes(key, "recall needs a query", "explicit empty-recall failure");
 
 if (failures.length) {
   console.error("Work presence verification failed:");

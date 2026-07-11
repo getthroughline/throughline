@@ -231,7 +231,9 @@ async function callTool(name, args) {
       return { ...(stale ? { _stale: stale } : {}), context, since_last_session: cu.events ?? [] };
     }
     case "recall": {
-      const params = new URLSearchParams({ q: args.query ?? "", k: String(args.k ?? 8) });
+      if (!String(args.query ?? "").trim())
+        return { error: 'recall needs a query, e.g. recall({query:"东京"}) — for "what changed recently" use whoami\'s since_last_session.' };
+      const params = new URLSearchParams({ q: String(args.query), k: String(args.k ?? 8) });
       if (args.stream) params.set("stream", args.stream);
       if (args.since) params.set("since", args.since);
       if (args.until) params.set("until", args.until);
