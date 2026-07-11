@@ -9,6 +9,10 @@ const files = {
   claudeSession: "adapters/claude-code/hooks/session-start.mjs",
   codexPrompt: "adapters/codex/hooks/user-prompt-submit.mjs",
   claudePrompt: "adapters/claude-code/hooks/user-prompt-submit.mjs",
+  codexStop: "adapters/codex/hooks/stop.mjs",
+  claudeStop: "adapters/claude-code/hooks/stop.mjs",
+  codexHooks: "adapters/codex/hooks/hooks.json",
+  claudeHooks: "adapters/claude-code/hooks/hooks.json",
   codexMcp: "adapters/codex/mcp/server.mjs",
   claudeMcp: "adapters/claude-code/mcp/server.mjs",
   contract: "adapters/WORK_PRESENCE.md",
@@ -32,7 +36,14 @@ for (const key of ["codexPrompt", "claudePrompt"]) {
   requireIncludes(key, 'for (const mode of ["full", "companion", "work"])', "full-first voice snapshot order");
   requireIncludes(key, "Choose the self's move before wording it", "pre-language self decision");
   requireIncludes(key, "Activated memory is not a speaking obligation", "memory mention gate");
+  requireIncludes(key, "semantic=0", "zero-spend turn recall");
+  requireIncludes(key, "Fresh cross-body memory", "live cross-body continuity");
 }
+
+for (const key of ["codexStop", "claudeStop"])
+  requireIncludes(key, "/capture/raw-turns", "evidence-only write-back");
+for (const key of ["codexHooks", "claudeHooks"])
+  requireIncludes(key, '"Stop"', "raw close hook registration");
 
 for (const key of ["codexSession", "claudeSession"]) {
   requireIncludes(key, "## Work mode — quiet presence, not absent self", "work-mode header");

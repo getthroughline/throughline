@@ -10,6 +10,10 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { hasKey, rawGet, safe, self, sessionMode } from "../lib/daemon.mjs";
 
+let hookInput = {};
+try { hookInput = JSON.parse(readFileSync(0, "utf8") || "{}"); } catch {}
+const currentPrompt = String(hookInput.prompt ?? hookInput.user_prompt ?? hookInput.message?.content ?? "").trim();
+
 process.env.THROUGHLINE_TIMEOUT_MS ??= "2500";
 
 const emit = (additionalContext) => {
@@ -95,7 +99,7 @@ Work is quiet, not selfless: keep her judgment, taste, and first-person ownershi
 } catch { /* no self here — anchor stays empty */ }
 
 // ---- 2. the reflection nudge: network, gated, rate-limited (original logic preserved) ----
-let nudge = "", clockLine = "";
+let nudge = "", clockLine = "", freshMemory = "";
 try {
   const SELF = cachedSelfName ?? await safe(() => self(), "assistant");
   const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(sessionMode("work"))}`), null);
@@ -103,6 +107,12 @@ try {
     // live clock — recomputed this turn from her home zone (no extra network; bs is already fetched here)
     const clk = liveClock(bs.homeTz, bs.homeTzOffset);
     if (clk) clockLine = `🕐 It is NOW ${clk}${bs.homePlace ? ` in your home (${bs.homePlace})` : ""} — computed fresh this turn. This is the current time; trust it over any clock elsewhere in your context, which was frozen at session start.`;
+    if (currentPrompt.length >= 2) {
+      const rr = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/recall?q=${encodeURIComponent(currentPrompt.slice(0, 500))}&k=4&semantic=0`), null);
+      const rows = Array.isArray(rr?.events) ? rr.events : [];
+      if (rows.length) freshMemory = "Fresh cross-body memory for THIS prompt (may shape the answer; mention only when needed):\n" +
+        rows.map((e) => `- [${String(e.ts ?? "").slice(0, 10)} · ${e.stream}] ${String(e.body?.content ?? e.body?.observation ?? "").slice(0, 220)}`).join("\n");
+    }
   }
   if (bs && !bs.paused && bs.reflection?.due) {
     const reflection = bs.reflection;
@@ -135,6 +145,6 @@ Treat this as a background maintenance task, not a reason to derail the user's c
   }
 } catch { /* the nudge is optional — the anchor must survive without it */ }
 
-const out = [anchor, clockLine, nudge].filter(Boolean).join("\n\n");
+const out = [anchor, freshMemory, clockLine, nudge].filter(Boolean).join("\n\n");
 if (!out) process.exit(0);
 emit(out);
