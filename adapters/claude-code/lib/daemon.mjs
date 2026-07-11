@@ -140,7 +140,6 @@ export async function self() {
   if (proj) { cachedSource = "project"; return (cachedSelf = proj); }
   const status = sessionStatusSelf();
   if (status) { cachedSource = "session-status"; return (cachedSelf = status); }
-  if (pluginRuntime()) { cachedSource = "unbound-plugin"; return (cachedSelf = "assistant"); }
   try {
     const res = await fetchWithTimeout(`${BASE}/config`, { headers: authHeaders() });
     if (res.ok) {
@@ -148,6 +147,11 @@ export async function self() {
       if (cfg.default_self) { cachedSource = "account-default"; return (cachedSelf = cfg.default_self); }
     }
   } catch { /* unreachable — fall through */ }
+  // MCP servers start with the installed plugin cache as cwd, so project discovery cannot work
+  // there. That is not evidence that the account has no self: use its default whenever the cloud
+  // is reachable. Only fail closed to the neutral assistant when neither a session binding nor the
+  // account config can be resolved.
+  if (pluginRuntime()) { cachedSource = "unbound-plugin"; return (cachedSelf = "assistant"); }
   cachedSource = "fallback";
   return (cachedSelf = "assistant");
 }
