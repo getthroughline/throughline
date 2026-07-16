@@ -40,8 +40,11 @@ for (const key of ["codexPrompt", "claudePrompt"]) {
   requireIncludes(key, "Fresh cross-body memory", "live cross-body continuity");
 }
 
-for (const key of ["codexStop", "claudeStop"])
+for (const key of ["codexStop", "claudeStop"]) {
   requireIncludes(key, "/capture/raw-turns", "evidence-only write-back");
+  requireIncludes(key, "/capture/action-bundle", "bounded host action write-back");
+  requireIncludes(key, "parseActionBundle", "shared host transcript parser");
+}
 for (const key of ["codexHooks", "claudeHooks"])
   requireIncludes(key, '"Stop"', "raw close hook registration");
 

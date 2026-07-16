@@ -27,6 +27,9 @@ Codex and Claude Code.
 - Cross-body work has one owner. When `whoami` shows an embodied task assigned to this body, advance
   that task instead of recreating it. Mark `acting` when real work starts, `blocked` with the exact
   stopping point, and `completed` only after a concrete result exists. The return body owns delivery.
+- Host-local work closes as one bounded action bundle: tool categories, safe subjects, observed
+  outcome and final visible words. Never upload raw commands, full tool output or one memory per
+  low-level operation; a work segment is the autobiographical unit.
 
 ## Guarded Phrases
 
