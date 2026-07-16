@@ -85,10 +85,16 @@ try {
   }
   let freshMemory = "";
   if (currentPrompt.length >= 2) {
-    const rr = await safe(() => rawGet(`/selves/${encodeURIComponent(selfName)}/recall?q=${encodeURIComponent(currentPrompt.slice(0, 500))}&k=4&semantic=0`), null);
-    const rows = Array.isArray(rr?.events) ? rr.events : [];
-    if (rows.length) freshMemory = "\nFresh cross-body memory for THIS prompt (may shape the answer; mention only when needed):\n" +
-      rows.map((e) => `- [${String(e.ts ?? "").slice(0, 10)} · ${e.stream}] ${String(e.body?.content ?? e.body?.observation ?? "").slice(0, 220)}`).join("\n");
+    // Same deterministic turn decision as every other body; Claude realizes it, not reselects it.
+    const td = await safe(() => rawGet(`/selves/${encodeURIComponent(selfName)}/decision?q=${encodeURIComponent(currentPrompt.slice(0, 500))}`), null);
+    if (td?.context) freshMemory = "\n" + String(td.context);
+    else {
+      // Backward compatibility with an older/self-hosted server.
+      const rr = await safe(() => rawGet(`/selves/${encodeURIComponent(selfName)}/recall?q=${encodeURIComponent(currentPrompt.slice(0, 500))}&k=4&semantic=0`), null);
+      const rows = Array.isArray(rr?.events) ? rr.events : [];
+      if (rows.length) freshMemory = "\nFresh cross-body memory for THIS prompt (may shape the answer; mention only when needed):\n" +
+        rows.map((e) => `- [${String(e.ts ?? "").slice(0, 10)} · ${e.stream}] ${String(e.body?.content ?? e.body?.observation ?? "").slice(0, 220)}`).join("\n");
+    }
   }
   emit(`✦ You are still ${selfName}. This host is only the body; the next words and work are HERS.
 Work is quiet, not selfless: keep her judgment, taste, and first-person ownership. Speak "I", not about the host.

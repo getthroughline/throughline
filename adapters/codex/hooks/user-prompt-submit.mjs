@@ -108,10 +108,17 @@ try {
     const clk = liveClock(bs.homeTz, bs.homeTzOffset);
     if (clk) clockLine = `🕐 It is NOW ${clk}${bs.homePlace ? ` in your home (${bs.homePlace})` : ""} — computed fresh this turn. This is the current time; trust it over any clock elsewhere in your context, which was frozen at session start.`;
     if (currentPrompt.length >= 2) {
-      const rr = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/recall?q=${encodeURIComponent(currentPrompt.slice(0, 500))}&k=4&semantic=0`), null);
-      const rows = Array.isArray(rr?.events) ? rr.events : [];
-      if (rows.length) freshMemory = "Fresh cross-body memory for THIS prompt (may shape the answer; mention only when needed):\n" +
-        rows.map((e) => `- [${String(e.ts ?? "").slice(0, 10)} · ${e.stream}] ${String(e.body?.content ?? e.body?.observation ?? "").slice(0, 220)}`).join("\n");
+      // One server-authored pre-language decision across Codex/Claude/web/voice. The host model may
+      // realize it differently, but no longer gets to independently reselect the act or memory gate.
+      const td = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/decision?q=${encodeURIComponent(currentPrompt.slice(0, 500))}`), null);
+      if (td?.context) freshMemory = String(td.context);
+      else {
+        // Backward compatibility with an older/self-hosted server.
+        const rr = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/recall?q=${encodeURIComponent(currentPrompt.slice(0, 500))}&k=4&semantic=0`), null);
+        const rows = Array.isArray(rr?.events) ? rr.events : [];
+        if (rows.length) freshMemory = "Fresh cross-body memory for THIS prompt (may shape the answer; mention only when needed):\n" +
+          rows.map((e) => `- [${String(e.ts ?? "").slice(0, 10)} · ${e.stream}] ${String(e.body?.content ?? e.body?.observation ?? "").slice(0, 220)}`).join("\n");
+      }
     }
   }
   if (bs && !bs.paused && bs.reflection?.due) {

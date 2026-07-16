@@ -38,6 +38,8 @@ for (const key of ["codexPrompt", "claudePrompt"]) {
   requireIncludes(key, "Activated memory is not a speaking obligation", "memory mention gate");
   requireIncludes(key, "semantic=0", "zero-spend turn recall");
   requireIncludes(key, "Fresh cross-body memory", "live cross-body continuity");
+  requireIncludes(key, "/decision?q=", "canonical per-turn decision fetch");
+  requireIncludes(key, "realize", "host realizes rather than reselects the decision");
 }
 
 for (const key of ["codexStop", "claudeStop"]) {
