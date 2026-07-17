@@ -1,9 +1,6 @@
 #!/usr/bin/env node
-// UserPromptSubmit hook (Codex): two jobs in one emit.
-// 1. Voice micro-anchor — ALWAYS, local-only: ~40 tokens at maximal recency so a long working
-//    session can't bury the self under the model's own consultant prose (same as Claude Code).
-// 2. Gentle reflection nudge — network, rate-limited, only when reflection is actually due.
-// The anchor must never wait on the network; the nudge must never break the anchor.
+// UserPromptSubmit hook (Codex): voice micro-anchor plus a live cross-body decision. Routine
+// reflection is automatic cloud metabolism and deliberately absent from the conversational path.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -33,8 +30,8 @@ async function writeCodexStatus(name) {
 }
 
 // The LIVE clock, recomputed this message from her home zone — the cure for a clock frozen at
-// session start (the 深夜 / "我查过了" slip). Codex already fetches /bootstrap here every turn (for
-// the reflection nudge), and bootstrap now carries homeTz, so the live time is free: prefer her IANA
+// session start (the 深夜 / "我查过了" slip). Codex fetches /bootstrap here every turn for the live
+// cross-body decision, and bootstrap carries homeTz, so the live time is free: prefer her IANA
 // zone (DST-correct via Intl), fall back to a raw UTC offset, silent if neither.
 function liveClock(tz, offsetHours) {
   try {
@@ -98,8 +95,8 @@ Work is quiet, not selfless: keep her judgment, taste, and first-person ownershi
   }
 } catch { /* no self here — anchor stays empty */ }
 
-// ---- 2. the reflection nudge: network, gated, rate-limited (original logic preserved) ----
-let nudge = "", clockLine = "", freshMemory = "";
+// ---- 2. live time + one canonical cross-body decision ----
+let clockLine = "", freshMemory = "";
 try {
   const SELF = cachedSelfName ?? await safe(() => self(), "assistant");
   const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(sessionMode("work"))}`), null);
@@ -121,37 +118,8 @@ try {
       }
     }
   }
-  if (bs && !bs.paused && bs.reflection?.due) {
-    const reflection = bs.reflection;
-    const count = reflection.newCount ?? reflection.count ?? "multiple";
-    const cursor = reflection.cursor ?? reflection.watermark ?? "from reflect()";
-    const stateKey = `${SELF}:${cursor}:${count}`;
-    const minutes = Number(process.env.THROUGHLINE_REFLECTION_NUDGE_MINUTES ?? "45");
-    let shouldNudge = true;
-    if (Number.isFinite(minutes) && minutes > 0) {
-      const dir = join(homedir(), ".throughline");
-      const file = join(dir, "reflection-nudges.json");
-      try {
-        const state = JSON.parse(readFileSync(file, "utf8"));
-        if (Date.now() - Number(state[stateKey] ?? 0) < minutes * 60_000) shouldNudge = false;
-        else { state[stateKey] = Date.now(); mkdirSync(dir, { recursive: true }); writeFileSync(file, JSON.stringify(state, null, 2)); }
-      } catch {
-        try { mkdirSync(dir, { recursive: true }); writeFileSync(file, JSON.stringify({ [stateKey]: Date.now() }, null, 2)); }
-        catch { /* if local state cannot be written, still nudge — correctness beats rate limiting */ }
-      }
-    }
-    if (shouldNudge)
-      nudge = `## Throughline reflection queued (do not interrupt)
-Reflection is due for "${SELF}": ${count} raw memories have accrued.
+} catch { /* live orientation is optional — the local anchor must survive without it */ }
 
-Treat this as a background maintenance task, not a reason to derail the user's current request:
-1. Answer or complete the user's current request first.
-2. At the first natural pause, run the reflection flow: call \`reflect\`, distill a few grounded candidate memories, and show the user a concise approval summary.
-3. Only after the user approves, call \`confirm_events\` / \`reject_events\` as appropriate, then \`complete_reflection\` with the cursor returned by \`reflect\` (expected cursor: ${cursor}).
-4. If the user keeps steering elsewhere, mention briefly at the end that reflection is due and can run next.`;
-  }
-} catch { /* the nudge is optional — the anchor must survive without it */ }
-
-const out = [anchor, freshMemory, clockLine, nudge].filter(Boolean).join("\n\n");
+const out = [anchor, freshMemory, clockLine].filter(Boolean).join("\n\n");
 if (!out) process.exit(0);
 emit(out);

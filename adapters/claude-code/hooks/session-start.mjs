@@ -3,6 +3,7 @@
 // pending signals — and the standing instruction for the Throughline MCP tools.
 // Falls back to the legacy multi-call flow for old self-host daemons without /bootstrap.
 import { get, getText, isAuthError, rawGet, readSnapshot, safe, self, selfSource, sessionMode, hasKey, writeSnapshot } from "../lib/daemon.mjs";
+import { memoryReviewSignal } from "../lib/memory-review.mjs";
 
 const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
@@ -76,17 +77,11 @@ if (bs) {
       }
     } catch { /* prune is optional — never break the session over housekeeping */ }
   } catch { /* presence is optional — never break the session over it */ }
-  // Nudge budget: at most ONE ask per session start — stacked asks read as nagging, and nagging
-  // gets the whole product tuned out. Priority: review staged memories (clears the queue, all
-  // in-conversation) > reflection (which would only stage more) > under-capture coaching.
-  // Governance rides with reflection — alone it's noise.
-  if (bs.pending > 0)
-    signals.push(`## Staged memories awaiting your user's review (${bs.pending})\nThese were distilled earlier (reflection or heartbeat) and are waiting for approval. At a natural pause — after addressing what the user came for — offer ONCE: "I have ${bs.pending} staged memor${bs.pending > 1 ? "ies" : "y"} from earlier reflection — want to go through them now? Takes a minute." On yes: call \`pending\`, show each as a one-line summary, then \`confirm_events\` with the approved ids and \`reject_events\` for the declined — the whole review happens here in the conversation, no dashboard needed. If they decline, drop it and never re-ask this session.`);
-  else if (bs.reflection?.due) {
-    signals.push(`## Reflection queued (ask first)\n${bs.reflection.newCount} raw memories have accrued since the last reflection. Never run it unprompted — reflecting reads the self's accrued private memories. At a natural pause ask the user "reflection is due — run it now?"; only on their yes call \`reflect\`, distill with them, then \`complete_reflection\`. If they decline, the cloud heartbeat catches it.`);
-    if (bs.governance?.due)
-      signals.push("## Rule consolidation due\nActive rules/corrections exceed the cap. During reflection, merge same-direction rules (new row, `supersedes` the old) and classify genuine contradictions as `tension` relations. Rules must distill, not accumulate.");
-  } else if (bs.starved)
+  // Nudge budget: at most ONE ask per session start. Routine reflection is invisible cloud
+  // metabolism; a work body only helps the user review its governed results in small batches.
+  const reviewSignal = memoryReviewSignal(SELF, bs.pending);
+  if (reviewSignal) signals.push(reviewSignal);
+  else if (bs.pending <= 0 && bs.starved)
     signals.push("## You've been under-capturing\nSessions happened this week but NO memory accrued — you talked without journalling. Fix it this session: journal at every natural breakpoint, and at a natural pause ask the user whether anything from the last few days is worth backfilling (they retell, you journal it — never reconstruct it yourself).");
 } else {
   // /bootstrap returned nothing. Two very different causes — distinguish them, never conflate:
@@ -225,7 +220,8 @@ Only TWO things rise above a journal line:
 2. They explicitly say "**remember this**" → capture it directly.
 Everything else is just a journal line — don't agonize over which structured stream; sorting and
 de-duping is reflection's job, not yours.
-If a \`journal\` or \`propose_events\` result includes \`reflection_due\`, reflection just came due — at the next natural pause ask the user whether to run it (never unprompted). (Core identity / persona stays owner-only — never during
-normal work.)`}`;
+Routine reflection is automatic cloud metabolism. Never turn \`reflection_due\` into a user task or
+run a competing host-side distiller; only use \`reflect\` when the user explicitly asks to inspect or
+run reflection here. (Core identity / persona stays owner-only — never during normal work.)`}`;
 
 emit([guidance, ...signals, context].filter(Boolean).join("\n\n"));

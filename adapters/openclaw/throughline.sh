@@ -40,15 +40,16 @@ case "${1:-help}" in
     curl -sf "$BASE/selves/$(self)/context" "${auth[@]}" ;;
   propose)     # propose '<events-json>' — structured capture (rules/corrections stage for the user)
     curl -sf -X POST "$BASE/selves/$(self)/capture/propose" "${auth[@]}" -d "$2" ;;
-  pending)     # staged candidates awaiting the user's confirm
-    curl -sf "$BASE/selves/$(self)/capture/pending" "${auth[@]}" ;;
+  pending)     # pending [limit] — one small review batch (default 5, max 20)
+    n="${2:-5}"; [ "$n" -ge 1 ] 2>/dev/null || n=5; [ "$n" -le 20 ] || n=20
+    curl -sf "$BASE/selves/$(self)/capture/pending?limit=$n" "${auth[@]}" ;;
   confirm)     # confirm <event-id> — ONLY after the user explicitly approved in conversation
     curl -sf -X POST "$BASE/selves/$(self)/capture/confirm" "${auth[@]}" -d "{\"id\":\"$2\"}" ;;
   reject)      # reject <event-id> — discard a staged candidate the user declined
     curl -sf -X POST "$BASE/selves/$(self)/capture/reject" "${auth[@]}" -d "{\"id\":\"$2\"}" ;;
   retract)     # retract <event-id> — delete a wrongly captured memory
     curl -sf -X POST "$BASE/selves/$(self)/capture/retract" "${auth[@]}" -d "{\"id\":\"$2\"}" ;;
-  reflect)     # raw material + guidance for consolidation (run from HEARTBEAT when due)
+  reflect)     # manual diagnostic only when the user explicitly asks; cloud reflection is automatic
     curl -sf "$BASE/selves/$(self)/reflect" "${auth[@]}" ;;
   reflect-done) # reflect-done <cursor> — advance the watermark after distilling
     curl -sf -X POST "$BASE/selves/$(self)/reflect/complete" "${auth[@]}" -d "{\"cursor\":$2}" ;;

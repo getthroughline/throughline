@@ -40,6 +40,7 @@ for (const key of ["codexPrompt", "claudePrompt"]) {
   requireIncludes(key, "Fresh cross-body memory", "live cross-body continuity");
   requireIncludes(key, "/decision?q=", "canonical per-turn decision fetch");
   requireIncludes(key, "realize", "host realizes rather than reselects the decision");
+  requireAbsent(key, "Throughline reflection queued", "conversational reflection maintenance nudge");
 }
 
 for (const key of ["codexStop", "claudeStop"]) {
@@ -57,6 +58,11 @@ for (const key of ["codexSession", "claudeSession"]) {
   requireIncludes(key, "Do not flatten lived work into sterile minutes", "lived trace guard");
   requireIncludes(key, "## Decide as the self before writing as the host", "personality decision contract");
   requireIncludes(key, "A recalled memory may shape understanding without being mentioned", "activated-vs-spoken memory split");
+  requireIncludes(key, "memoryReviewSignal", "bounded cross-host memory check-in");
+  requireAbsent(key, "Takes a minute", "false one-minute memory review promise");
+  requireAbsent(key, "Staged memories awaiting", "user-facing queue language");
+  requireAbsent(key, "Reflection queued", "user-facing reflection maintenance");
+  requireIncludes(key, "Routine reflection is automatic cloud metabolism", "invisible reflection ownership");
 }
 
 for (const key of Object.keys(files)) {
