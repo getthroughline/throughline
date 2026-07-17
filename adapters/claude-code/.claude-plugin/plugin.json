@@ -1,6 +1,6 @@
 {
   "name": "throughline",
-  "version": "0.8.28",
+  "version": "0.8.29",
   "description": "Throughline continuity for Claude Code: self-context injection, journal-first low-friction capture, reflection, recall. Cloud-first; self-host optional.",
   "mcpServers": {
     "throughline": {
