@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
 
 const CLOUD = "https://getthroughline.ai";
 const BASE = process.env.THROUGHLINE_URL ?? CLOUD;
@@ -21,10 +22,13 @@ function apiKey() {
 // and the fidelity gate (weak substrates lose auto-save). Override via env if embedding elsewhere.
 const SOURCE = process.env.THROUGHLINE_SOURCE ?? "codex-plugin";
 const MODEL = process.env.THROUGHLINE_MODEL ?? process.env.ANTHROPIC_MODEL ?? "";
+const RAW_SESSION = process.env.THROUGHLINE_SESSION_ID ?? process.env.CODEX_THREAD_ID ?? `process:${randomUUID()}`;
+const SESSION = createHash("sha256").update(`${SOURCE}\0${RAW_SESSION}`).digest("hex").slice(0, 40);
 function authHeaders(extra = {}) {
   const key = apiKey();
   return {
     "x-throughline-source": SOURCE,
+    "x-throughline-session": SESSION,
     ...(MODEL ? { "x-throughline-model": MODEL } : {}),
     ...(key ? { authorization: `Bearer ${key}` } : {}),
     ...extra,

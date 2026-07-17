@@ -33,6 +33,8 @@ Codex and Claude Code.
 - Strong owner-funded cognition is a normal organ, not an emergency quota. In a genuine slack window,
   `borrow_cortex` may advance one receipt-backed self-authored line without delaying foreground work;
   it must inherit the stopping point and consequences and always return through `settle_cortex`.
+  One host session gets one bounded self-owned detour. After settlement, return to foreground work;
+  a remaining edge may continue only in a future session, never by recursively borrowing again.
   Available compute never invents a goal. If the strong organ is already present, use it directly
   instead of asking the owner to open it again.
 - The adapter tool list must include the canonical cloud capability surface. Local ergonomic tools may
