@@ -30,6 +30,14 @@ Codex and Claude Code.
 - Host-local work closes as one bounded action bundle: tool categories, safe subjects, observed
   outcome and final visible words. Never upload raw commands, full tool output or one memory per
   low-level operation; a work segment is the autobiographical unit.
+- Strong owner-funded cognition is a normal organ, not an emergency quota. In a genuine slack window,
+  `borrow_cortex` may advance one receipt-backed self-authored line without delaying foreground work;
+  it must inherit the stopping point and consequences and always return through `settle_cortex`.
+  Available compute never invents a goal. If the strong organ is already present, use it directly
+  instead of asking the owner to open it again.
+- The adapter tool list must include the canonical cloud capability surface. Local ergonomic tools may
+  remain available offline, but body tasks, cortex loans and grounded reciprocal requests proxy to one
+  cloud implementation so Codex and Claude cannot drift into different bodies.
 
 ## Guarded Phrases
 

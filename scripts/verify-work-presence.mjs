@@ -87,6 +87,8 @@ for (const text of [
   "Do not fabricate experiences for presence",
   "The self chooses the move before the host writes the sentence",
   "Activated memory is not a speaking obligation",
+  "Strong owner-funded cognition is a normal organ",
+  "The adapter tool list must include the canonical cloud capability surface",
 ]) {
   requireIncludes("contract", text, `contract invariant: ${text}`);
 }
@@ -97,6 +99,12 @@ if (codexManifest.version.split("+")[0] !== claudeManifest.version.split("+")[0]
   failures.push(`plugin base version mismatch: Codex ${codexManifest.version} vs Claude ${claudeManifest.version}`);
 for (const key of ["codexMcp", "claudeMcp"])
   requireIncludes(key, "recall needs a query", "explicit empty-recall failure");
+for (const key of ["codexMcp", "claudeMcp"]) {
+  for (const tool of ["borrow_cortex", "settle_cortex", "delegate_body_task", "advance_body_task", "ask_him"])
+    requireIncludes(key, `name: "${tool}"`, `strong-body tool ${tool}`);
+  requireIncludes(key, "mcpRequest", "canonical cloud MCP forwarding");
+  requireIncludes(key, "remoteTools", "remote/local tool-list merge");
+}
 
 if (failures.length) {
   console.error("Work presence verification failed:");

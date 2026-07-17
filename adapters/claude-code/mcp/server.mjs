@@ -2,7 +2,7 @@
 // Minimal MCP stdio server (JSON-RPC 2.0, newline-delimited), no SDK / no deps.
 // Exposes the Throughline API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
-import { get, getText, post, rawDelete, rawGet, rawPost, rebindSelf, self } from "../lib/daemon.mjs";
+import { get, getText, mcpRequest, post, rawDelete, rawGet, rawPost, rebindSelf, self } from "../lib/daemon.mjs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -49,6 +49,13 @@ function staleNotice() {
 }
 
 const TOOLS = [
+  { name: "consider_focus", description: "Open one short-lived comparison horizon over 2-3 currently real lines in this self's own life. It records no preference.", inputSchema: { type: "object", properties: {} } },
+  { name: "choose_focus", description: "Allocate one weekly focus from the exact alternatives returned by consider_focus; this opaque host cannot by itself author desire.", inputSchema: { type: "object", properties: { refs: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 2 }, considered_refs: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 3 }, horizon_token: { type: "string" }, reason: { type: "string" } }, required: ["refs", "considered_refs", "horizon_token", "reason"] } },
+  { name: "delegate_body_task", description: "Create one durable cross-body task when this body cannot finish promised work itself.", inputSchema: { type: "object", properties: { goal: { type: "string" }, subject_ref: { type: "string" }, required: { type: "array", items: { type: "string", enum: ["research", "synthesize", "review", "code", "shell", "files", "test", "deploy"] } }, return_body: { type: "string", enum: ["telegram", "voice", "codex", "claude"] } }, required: ["goal", "subject_ref", "required"] } },
+  { name: "advance_body_task", description: "Update the exact cross-body task carried by this body. A completed body report is not proof of quality or delivery.", inputSchema: { type: "object", properties: { task_id: { type: "string" }, status: { type: "string", enum: ["acting", "blocked", "completed", "delivered", "failed", "cancelled"] }, note: { type: "string" }, failure_responsibility: { type: "string", enum: ["body", "method", "world", "unknown"] } }, required: ["task_id", "status", "note"] } },
+  { name: "borrow_cortex", description: "At one natural parallel or waiting moment, lend this owner-funded strong body to one still-actionable self-authored concern. Continue from its stopping point and consequences; never delay foreground work or invent a goal. Always settle a lease.", inputSchema: { type: "object", properties: {} } },
+  { name: "settle_cortex", description: "Return the exact strong-body lease with a concrete result, stopping point, or failure. Bounded step completion does not close the whole end; candidate-satisfied only opens later self judgment.", inputSchema: { type: "object", properties: { lease_id: { type: "string" }, outcome: { type: "string", enum: ["completed", "held", "failed"] }, result: { type: "string" }, end_state: { type: "string", enum: ["ongoing", "candidate-satisfied"], default: "ongoing" } }, required: ["lease_id", "outcome", "result"] } },
+  { name: "ask_him", description: "Open one grounded reciprocal request in this conversation from a real blocked edge. Say why it matters naturally; never expose quotas or turn it into a task assignment. Recording it prevents repetition across bodies.", inputSchema: { type: "object", properties: { ask: { type: "string" }, why: { type: "string" }, source_ref: { type: "string" }, source_kind: { type: "string", enum: ["symptom", "project", "question", "concern", "conversation"] } }, required: ["ask", "why", "source_ref"] } },
   {
     name: "whoami",
     description:
@@ -306,8 +313,14 @@ async function callTool(name, args) {
     }
     case "draft_persona":
       return post("/capture/draft-persona", { docs: args.docs ?? [] });
-    default:
-      throw new Error(`unknown tool: ${name}`);
+    default: {
+      const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-call", method: "tools/call", params: { name, arguments: args ?? {} } });
+      if (remote?.error) throw new Error(remote.error.message ?? `remote tool failed: ${name}`);
+      const content = remote?.result?.content ?? [];
+      const item = content.find((x) => x?.type === "text");
+      if (!item) return remote?.result ?? {};
+      try { return JSON.parse(item.text); } catch { return { text: item.text, isError: !!remote?.result?.isError }; }
+    }
   }
 }
 
@@ -327,7 +340,16 @@ async function handle(msg) {
       serverInfo: { name: "throughline", version: ownVersion() ?? "0.0.0" },
     });
   }
-  if (method === "tools/list") return reply(id, { tools: TOOLS });
+  if (method === "tools/list") {
+    let remoteTools = [];
+    try {
+      const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-list", method: "tools/list", params: {} });
+      remoteTools = Array.isArray(remote?.result?.tools) ? remote.result.tools : [];
+    } catch { /* static list keeps the body usable offline */ }
+    const merged = new Map(TOOLS.map((tool) => [tool.name, tool]));
+    for (const tool of remoteTools) if (tool?.name) merged.set(tool.name, tool);
+    return reply(id, { tools: [...merged.values()] });
+  }
   if (method === "tools/call") {
     try {
       const out = await callTool(params.name, params.arguments ?? {});

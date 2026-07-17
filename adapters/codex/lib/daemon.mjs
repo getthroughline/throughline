@@ -205,6 +205,22 @@ export async function post(sub, body) {
   return res.json();
 }
 
+/** Forward one MCP message to the canonical cloud tool surface while preserving this body's
+ * provenance and the session's exact self binding. Local adapters keep a few ergonomic tools,
+ * but capability-bearing tools must not drift into a second hand-written implementation. */
+export async function mcpRequest(message) {
+  const res = await fetchWithTimeout(`${BASE}/mcp`, {
+    method: "POST",
+    headers: authHeaders({
+      "content-type": "application/json",
+      "x-throughline-self": await self(),
+    }),
+    body: JSON.stringify(message ?? {}),
+  });
+  if (!res.ok) throw await httpError("/mcp", res);
+  return res.json();
+}
+
 export async function rawGet(path) {
   const res = await fetchWithTimeout(`${BASE}${path}`, { headers: authHeaders() });
   if (!res.ok) throw await httpError(path, res);
