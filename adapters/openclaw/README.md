@@ -22,18 +22,18 @@ curl -fsSL https://getthroughline.ai/openclaw.sh | bash -s -- ~/.openclaw/worksp
 ```
 
 (The pin is a `.throughline` file in the workspace — same convention as the Claude Code plugin.
-Manual install: copy `throughline.sh` to `scripts/`, paste the two snippets, set the key in `~/.openclaw/.env`.)
+Manual install: copy `throughline.sh` to `scripts/`, paste `AGENTS-SNIPPET.md`, set the key in
+`~/.openclaw/.env`.)
 
 ## What you get
 
 - **Session start**: `throughline.sh bootstrap` returns the self-context (persona, rules,
-  most-alive memories) plus reflection/pending signals — the AGENTS.md block tells the model
+  most-alive memories) plus a bounded review signal — the AGENTS.md block tells the model
   to run it and fully adopt the identity.
 - **Journal-first capture**: the model drops one-line diary notes via `throughline.sh journal`
   at natural moments — no schema, no ceremony. Standing rules go through `propose` and stage
   for your confirmation.
-- **Heartbeat reflection**: the HEARTBEAT.md block distills accrued raw memory into lasting
-  structured memory on OpenClaw's own cadence — the same consolidation contract as every
-  other host, run by your model.
+- **Invisible reflection**: the cloud distills accrued raw memory on one canonical cadence.
+  OpenClaw never turns memory maintenance into a user task or runs a competing distiller.
 
 Memory written here surfaces everywhere; memory written anywhere surfaces here.

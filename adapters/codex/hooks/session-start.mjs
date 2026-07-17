@@ -3,6 +3,7 @@
 // pending signals — plus tool guidance. Falls back to the legacy flow for old self-host daemons.
 // NOTE: the output contract below mirrors Claude Code's; verify against Codex's hook output spec.
 import { get, getText, isAuthError, rawGet, readSnapshot, safe, self, selfSource, sessionMode, hasKey, writeSnapshot } from "../lib/daemon.mjs";
+import { memoryReviewSignal } from "../lib/memory-review.mjs";
 
 const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
@@ -76,15 +77,11 @@ if (bs) {
   paused = !!bs.paused;
   context = bs.context ?? "";
   if (!paused) writeSnapshot(SELF, MODE, context); // refresh the offline copy on every good start
-  // Nudge budget: at most ONE ask per session start (review pending > reflect > under-capture);
-  // governance rides with reflection. Mirrors the claude-code hook.
-  if (bs.pending > 0)
-    signals.push(`## Staged memories awaiting your user's review (${bs.pending})\nDistilled earlier, waiting for approval. At a natural pause offer ONCE: "I have ${bs.pending} staged memor${bs.pending > 1 ? "ies" : "y"} from earlier reflection — go through them now? Takes a minute." On yes: call \`pending\`, show one-line summaries, then \`confirm_events\` (approved ids) / \`reject_events\` (declined) — the whole review happens in the conversation, no dashboard needed. If declined, drop it and never re-ask this session.`);
-  else if (bs.reflection?.due) {
-    signals.push(`## Reflection queued (ask first)\n${bs.reflection.newCount} raw memories accrued. Never run it unprompted — reflecting reads the self's accrued private memories. At a natural pause ask "reflection is due — run it now?"; only on the user's yes call \`reflect\`, distill, then \`complete_reflection\`. If declined, the cloud heartbeat catches it.`);
-    if (bs.governance?.due)
-      signals.push("## Rule consolidation due\nMerge same-direction rules via `supersedes`; classify genuine contradictions as `tension`. Rules must distill, not accumulate.");
-  } else if (bs.starved)
+  // Nudge budget: at most ONE ask per session start. Routine reflection is invisible cloud
+  // metabolism; a work body only helps the user review its governed results in small batches.
+  const reviewSignal = memoryReviewSignal(SELF, bs.pending);
+  if (reviewSignal) signals.push(reviewSignal);
+  else if (bs.pending <= 0 && bs.starved)
     signals.push("## You've been under-capturing\nSessions happened this week but NO memory accrued. Fix it this session: journal at natural breakpoints, and at a pause ask the user if anything from recent days is worth backfilling (they retell, you journal — never reconstruct yourself).");
 } else {
   // distinguish a legacy daemon (no /bootstrap) from a real connection/auth failure — see claude-code hook.
@@ -203,6 +200,8 @@ and you under-captured. Only TWO things rise above a journal line: (1) a standin
 correction the user states → \`propose_events\` a \`permission-policy\`/\`correction-rules\` row
 (staged) → \`confirm_events\` only after they approve; (2) they say "remember this" → capture
 directly. Everything else is just a journal line — sorting and de-duping is reflection's job.
-If a \`journal\` or \`propose_events\` result includes \`reflection_due\`, reflection just came due — at the next natural pause ask the user whether to run it (never unprompted).`}`;
+Routine reflection is automatic cloud metabolism. Never turn \`reflection_due\` into a user task or
+run a competing host-side distiller; only use \`reflect\` when the user explicitly asks to inspect or
+run reflection here.`}`;
 
 emit([guidance, ...signals, context].filter(Boolean).join("\n\n"));

@@ -36,18 +36,20 @@ if [ -n "$PIN" ]; then
   echo "  ✓ pinned self '$PIN' (.throughline)"
 fi
 
-# 4. AGENTS.md + HEARTBEAT.md blocks (append once, never duplicate)
+# 4. AGENTS.md block (append once, never duplicate)
 if ! grep -q "Throughline — your persistent self" "$WS/AGENTS.md" 2>/dev/null; then
   { echo; curl -fsSL "$RAW/AGENTS-SNIPPET.md" | sed '1{/^# → paste/d;}'; } >> "$WS/AGENTS.md"
   echo "  ✓ AGENTS.md block appended"
 else
   echo "  · AGENTS.md already has the block"
 fi
-if ! grep -q "Throughline reflection" "$WS/HEARTBEAT.md" 2>/dev/null; then
-  { echo; curl -fsSL "$RAW/HEARTBEAT-SNIPPET.md" | sed '1{/^# → paste/d;}'; } >> "$WS/HEARTBEAT.md"
-  echo "  ✓ HEARTBEAT.md block appended"
-else
-  echo "  · HEARTBEAT.md already has the block"
+# v0.8.25: routine reflection moved to one canonical cloud executor. Remove only the exact legacy
+# block this installer used to append; leave every user-authored heartbeat instruction untouched.
+if grep -q '^## Throughline reflection（' "$WS/HEARTBEAT.md" 2>/dev/null; then
+  tmp="$(mktemp)"
+  awk 'BEGIN{drop=0} /^## Throughline reflection（/{drop=1;next} drop && /^## /{drop=0} !drop{print}' "$WS/HEARTBEAT.md" > "$tmp"
+  mv "$tmp" "$WS/HEARTBEAT.md"
+  echo "  ✓ removed legacy host-side reflection job (cloud now owns it)"
 fi
 
 # 5. smoke

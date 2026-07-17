@@ -93,7 +93,7 @@ const TOOLS = [
       required: ["events"],
     },
   },
-  { name: "pending", description: "List candidate events staged for confirmation.", inputSchema: { type: "object", properties: {} } },
+  { name: "pending", description: "Review a small batch of candidate memories. Defaults to 5 and returns the total and remaining count.", inputSchema: { type: "object", properties: { limit: { type: "number", minimum: 1, maximum: 20, default: 5 } } } },
   {
     name: "coverage",
     description:
@@ -104,9 +104,8 @@ const TOOLS = [
   {
     name: "reflect",
     description:
-      "Consolidate: fetch the raw memories accrued since the last reflection (incl. journal prose) " +
-      "plus existing stances/rules, so you can distill them into lasting higher-order memories. " +
-      "Call when the self-context says reflection is due; follow the returned guidance.",
+      "Manual reflection diagnostic: fetch accrued raw memories only when the user explicitly asks " +
+      "to inspect or run reflection here. Routine reflection runs automatically in the cloud.",
     inputSchema: { type: "object", properties: {} },
   },
   {
@@ -243,25 +242,12 @@ async function callTool(name, args) {
       return post("/capture/propose", { events: args.events ?? [], source: "codex" });
     case "handoff":
       return post("/handoff", { project: args.project ?? "", note: args.note ?? "" });
-    case "journal": {
-      const saved = await post("/journal", { content: args.content ?? "" });
-      const bs = await rawGet(`/selves/${encodeURIComponent(await self())}/bootstrap`).catch(() => null);
-      if (!bs?.reflection?.due) return saved;
-      return {
-        ...saved,
-        _reflection_nudge: {
-          due: true,
-          newCount: bs.reflection.newCount,
-          cursor: bs.reflection.cursor,
-          instruction:
-            "Journal was saved at a natural breakpoint and reflection is due. Briefly tell the user reflection is ready and ask whether to run it now. If they agree, call reflect, distill a few grounded candidates, get approval, then complete_reflection with reflect's cursor.",
-        },
-      };
-    }
+    case "journal":
+      return post("/journal", { content: args.content ?? "" });
     case "retract_event":
       return post("/capture/retract", { id: args.id ?? "" });
     case "pending":
-      return get("/capture/pending");
+      return get(`/capture/pending?limit=${Math.max(1, Math.min(20, Math.trunc(Number(args.limit) || 5)))}`);
     case "coverage": {
       const params = new URLSearchParams({ q: args.topic ?? "" });
       return get(`/coverage?${params}`);
