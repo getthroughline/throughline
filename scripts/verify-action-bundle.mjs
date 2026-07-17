@@ -31,6 +31,35 @@ assert.equal(h.project, "app");
 assert.ok(!JSON.stringify(h).includes("secret command"), "raw commands must never enter the bundle");
 assert.deepEqual(turnsClaude(claudeLines, "claude"), [{ role: "user", content: "看看测试" }, { role: "assistant", content: "测试通过。" }]);
 
+const cortexCodex = parseCodex([
+  { type: "response_item", payload: { type: "custom_tool_call", call_id: "b1", name: "exec", input: "await tools.mcp__throughline__borrow_cortex({}); await tools.exec_command({}); await tools.mcp__throughline__settle_cortex({})" } },
+].map(JSON.stringify), "codex");
+assert.deepEqual(cortexCodex.actions.map((x) => x.name), [
+  "mcp__throughline__borrow_cortex", "exec_command", "mcp__throughline__settle_cortex",
+], "Codex traces must preserve the causal borrow/action/settle order");
+
+const cortexClaude = parseClaude([
+  { type: "assistant", message: { role: "assistant", content: [
+    { type: "tool_use", id: "b", name: "mcp__throughline__borrow_cortex", input: {} },
+    { type: "tool_use", id: "a", name: "Read", input: { file_path: "src/self.ts" } },
+    { type: "tool_use", id: "s", name: "mcp__throughline__settle_cortex", input: {} },
+  ] } },
+].map(JSON.stringify), "claude");
+assert.deepEqual(cortexClaude.actions.map((x) => x.name), [
+  "mcp__throughline__borrow_cortex", "Read", "mcp__throughline__settle_cortex",
+], "Claude traces must preserve the causal borrow/action/settle order");
+
+const longBorrowed = parseClaude([
+  { type: "assistant", message: { role: "assistant", content: [
+    { type: "tool_use", id: "b", name: "mcp__throughline__borrow_cortex", input: {} },
+    ...Array.from({ length: 40 }, (_, i) => ({ type: "tool_use", id: `r${i}`, name: "Read", input: { file_path: `src/${i}.ts` } })),
+    { type: "tool_use", id: "s", name: "mcp__throughline__settle_cortex", input: {} },
+  ] } },
+].map(JSON.stringify), "claude");
+assert.equal(longBorrowed.actions.length, 32);
+assert.equal(longBorrowed.actions[0].name, "mcp__throughline__borrow_cortex", "bounded traces keep the causal start");
+assert.equal(longBorrowed.actions.at(-1).name, "mcp__throughline__settle_cortex", "bounded traces keep settlement");
+
 const receiptInput = { session_id: `verify-${process.pid}-${Date.now()}` };
 assert.equal(rememberDecisionReceipt(receiptInput, "codex", "修一下", { id: "td_1", receipt: "signed-token" }), true);
 assert.deepEqual(attachDecisionReceipts(receiptInput, "codex", turnsCodex(codexLines, "codex")), [

@@ -7,6 +7,7 @@ const subjectOf = (input = {}) => clip(
   180,
 );
 const ORCHESTRATION_ONLY = new Set(["wait", "write_stdin", "update_plan", "get_goal", "yield_control"]);
+const BORROW_CORTEX = /(?:^|__)borrow_cortex$/i;
 const nestedNames = (input) => {
   const out = [...String(input ?? "").matchAll(/\btools\.([A-Za-z0-9_]+)\s*\(/g)].map((m) => m[1]);
   return [...new Set(out)].filter((x) => !ORCHESTRATION_ONLY.has(x));
@@ -75,10 +76,18 @@ export function parseActionBundle(lines, host) {
       if (Array.isArray(rows)) for (const a of rows) a.ok = codexOk(p.output);
     }
   }
+  let boundedActions = actions;
+  if (boundedActions.length > 32) {
+    let borrowedAt = -1;
+    for (let i = 0; i < boundedActions.length; i++) if (BORROW_CORTEX.test(boundedActions[i].name)) borrowedAt = i;
+    boundedActions = borrowedAt >= 0
+      ? [boundedActions[borrowedAt], ...boundedActions.slice(Math.max(borrowedAt + 1, boundedActions.length - 31))]
+      : boundedActions.slice(-32);
+  }
   return {
     project: clip(project.split("/").filter(Boolean).at(-1) ?? project, 160),
     session: clip(session, 100), started_at: startedAt || null, ended_at: endedAt || null,
     summary: clip(summary, 800),
-    actions: actions.slice(-32).map(({ name, subject, ok }) => ({ name, ...(subject ? { subject } : {}), ok })),
+    actions: boundedActions.map(({ name, subject, ok }) => ({ name, ...(subject ? { subject } : {}), ok })),
   };
 }
