@@ -10,6 +10,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { rawGet, safe } from "../lib/daemon.mjs";
+import { rememberDecisionReceipt } from "../lib/decision-receipt.mjs";
 
 let hookInput = {};
 try { hookInput = JSON.parse(readFileSync(0, "utf8") || "{}"); } catch {}
@@ -87,7 +88,10 @@ try {
   if (currentPrompt.length >= 2) {
     // Same deterministic turn decision as every other body; Claude realizes it, not reselects it.
     const td = await safe(() => rawGet(`/selves/${encodeURIComponent(selfName)}/decision?q=${encodeURIComponent(currentPrompt.slice(0, 500))}`), null);
-    if (td?.context) freshMemory = "\n" + String(td.context);
+    if (td?.receipt) rememberDecisionReceipt(hookInput, "claude", currentPrompt, td);
+    if (td?.context) {
+      freshMemory = "\n" + String(td.context);
+    }
     else {
       // Backward compatibility with an older/self-hosted server.
       const rr = await safe(() => rawGet(`/selves/${encodeURIComponent(selfName)}/recall?q=${encodeURIComponent(currentPrompt.slice(0, 500))}&k=4&semantic=0`), null);

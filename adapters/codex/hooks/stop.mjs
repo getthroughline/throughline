@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { hasKey, rawPost, safe, self, sessionMode } from "../lib/daemon.mjs";
 import { parseActionBundle, parseVisibleTurns } from "../lib/action-bundle.mjs";
+import { attachDecisionReceipts } from "../lib/decision-receipt.mjs";
 
 const done = () => process.exit(0);
 try {
@@ -16,11 +17,12 @@ try {
   const cursorFile = join(tmpdir(), "throughline-raw-" + Buffer.from(input.transcript_path).toString("base64url").slice(-40) + ".json");
   let cursor = {}; try { cursor = JSON.parse(readFileSync(cursorFile, "utf8")); } catch {}
   const fresh = turns.slice(cursor.n || 0);
+  const witnessed = attachDecisionReceipts(input, "codex", fresh.slice(-8));
   const actionStart = cursor.actionLines || 0;
   const bundle = parseActionBundle(lines.slice(actionStart), "codex");
   const name = await safe(() => self(), "assistant");
-  const saved = fresh.length >= 2
-    ? await safe(() => rawPost(`/selves/${encodeURIComponent(name)}/capture/raw-turns`, { turns: fresh.slice(-8) }), null)
+  const saved = witnessed.length >= 2
+    ? await safe(() => rawPost(`/selves/${encodeURIComponent(name)}/capture/raw-turns`, { turns: witnessed }), null)
     : true;
   const actionSaved = bundle.actions.length
     ? await safe(() => rawPost(`/selves/${encodeURIComponent(name)}/capture/action-bundle`, {

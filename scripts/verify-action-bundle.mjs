@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseActionBundle as parseCodex, parseVisibleTurns as turnsCodex } from "../adapters/codex/lib/action-bundle.mjs";
 import { parseActionBundle as parseClaude, parseVisibleTurns as turnsClaude } from "../adapters/claude-code/lib/action-bundle.mjs";
+import { attachDecisionReceipts, rememberDecisionReceipt } from "../adapters/codex/lib/decision-receipt.mjs";
 
 const codexLines = [
   { type: "response_item", timestamp: "2026-07-16T01:00:00Z", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "修一下" }] } },
@@ -30,9 +31,23 @@ assert.equal(h.project, "app");
 assert.ok(!JSON.stringify(h).includes("secret command"), "raw commands must never enter the bundle");
 assert.deepEqual(turnsClaude(claudeLines, "claude"), [{ role: "user", content: "看看测试" }, { role: "assistant", content: "测试通过。" }]);
 
+const receiptInput = { session_id: `verify-${process.pid}-${Date.now()}` };
+assert.equal(rememberDecisionReceipt(receiptInput, "codex", "修一下", { id: "td_1", receipt: "signed-token" }), true);
+assert.deepEqual(attachDecisionReceipts(receiptInput, "codex", turnsCodex(codexLines, "codex")), [
+  { role: "user", content: "修一下" },
+  { role: "assistant", content: "修完并验证了。", decision_receipt: "signed-token" },
+]);
+assert.deepEqual(attachDecisionReceipts(receiptInput, "codex", turnsCodex(codexLines, "codex")), turnsCodex(codexLines, "codex"),
+  "a delivered receipt is consumed exactly once");
+
 assert.equal(
   readFileSync(new URL("../adapters/codex/lib/action-bundle.mjs", import.meta.url), "utf8"),
   readFileSync(new URL("../adapters/claude-code/lib/action-bundle.mjs", import.meta.url), "utf8"),
   "host parsers must stay byte-identical",
+);
+assert.equal(
+  readFileSync(new URL("../adapters/codex/lib/decision-receipt.mjs", import.meta.url), "utf8"),
+  readFileSync(new URL("../adapters/claude-code/lib/decision-receipt.mjs", import.meta.url), "utf8"),
+  "host receipt witnesses must stay byte-identical",
 );
 console.log("Action bundle verification passed.");

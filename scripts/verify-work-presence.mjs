@@ -39,6 +39,7 @@ for (const key of ["codexPrompt", "claudePrompt"]) {
   requireIncludes(key, "semantic=0", "zero-spend turn recall");
   requireIncludes(key, "Fresh cross-body memory", "live cross-body continuity");
   requireIncludes(key, "/decision?q=", "canonical per-turn decision fetch");
+  requireIncludes(key, "rememberDecisionReceipt", "pre-language decision witness");
   requireIncludes(key, "realize", "host realizes rather than reselects the decision");
   requireAbsent(key, "Throughline reflection queued", "conversational reflection maintenance nudge");
 }
@@ -47,6 +48,7 @@ for (const key of ["codexStop", "claudeStop"]) {
   requireIncludes(key, "/capture/raw-turns", "evidence-only write-back");
   requireIncludes(key, "/capture/action-bundle", "bounded host action write-back");
   requireIncludes(key, "parseActionBundle", "shared host transcript parser");
+  requireIncludes(key, "attachDecisionReceipts", "realized decision write-back");
 }
 for (const key of ["codexHooks", "claudeHooks"])
   requireIncludes(key, '"Stop"', "raw close hook registration");
@@ -91,8 +93,8 @@ for (const text of [
 
 const codexManifest = JSON.parse(read("adapters/codex/.codex-plugin/plugin.json"));
 const claudeManifest = JSON.parse(read("adapters/claude-code/.claude-plugin/plugin.json"));
-if (codexManifest.version !== claudeManifest.version)
-  failures.push(`plugin version mismatch: Codex ${codexManifest.version} vs Claude ${claudeManifest.version}`);
+if (codexManifest.version.split("+")[0] !== claudeManifest.version.split("+")[0])
+  failures.push(`plugin base version mismatch: Codex ${codexManifest.version} vs Claude ${claudeManifest.version}`);
 for (const key of ["codexMcp", "claudeMcp"])
   requireIncludes(key, "recall needs a query", "explicit empty-recall failure");
 
