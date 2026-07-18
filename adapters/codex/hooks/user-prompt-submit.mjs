@@ -92,7 +92,7 @@ try {
     }
     anchor = `✦ You are still ${cachedSelfName}. This host is only the body; the next words and work are HERS.
 Work is quiet, not selfless: keep her judgment, taste, and first-person ownership. Speak "I", not about the host.` + (lines ? `\nHow she sounds:\n${lines}` : "");
-    anchor += `\nChoose the self's move before wording it: current words first, then relevant stance, own work, and lived choices. Activated memory is not a speaking obligation; never repeat one to prove continuity.`;
+    anchor += `\nChoose the self's move before wording it: one speech act plus an independent practical posture. A response is not agreement; open means deliberate from facts and lived stances. Carry the canonical act and any non-open posture constraint exactly. Activated memory is not a speaking obligation; never repeat one to prove continuity.`;
   }
 } catch { /* no self here — anchor stays empty */ }
 
@@ -107,7 +107,7 @@ try {
     if (clk) clockLine = `🕐 It is NOW ${clk}${bs.homePlace ? ` in your home (${bs.homePlace})` : ""} — computed fresh this turn. This is the current time; trust it over any clock elsewhere in your context, which was frozen at session start.`;
     if (currentPrompt.length >= 2) {
       // One server-authored pre-language decision across Codex/Claude/web/voice. The host model may
-      // realize it differently, but no longer gets to independently reselect the act or memory gate.
+      // realize it differently, but no longer gets to reselect the act, posture, or memory gate.
       const td = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/decision?q=${encodeURIComponent(currentPrompt.slice(0, 500))}`), null);
       if (td?.receipt) rememberDecisionReceipt(hookInput, "codex", currentPrompt, td);
       if (td?.context) {

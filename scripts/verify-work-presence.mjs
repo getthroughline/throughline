@@ -35,6 +35,8 @@ for (const key of ["codexPrompt", "claudePrompt"]) {
   requireIncludes(key, 'Speak "I", not about the host', "first-person anchor");
   requireIncludes(key, 'for (const mode of ["full", "companion", "work"])', "full-first voice snapshot order");
   requireIncludes(key, "Choose the self's move before wording it", "pre-language self decision");
+  requireIncludes(key, "independent practical posture", "act/posture separation");
+  requireIncludes(key, "A response is not agreement", "non-sycophancy posture boundary");
   requireIncludes(key, "Activated memory is not a speaking obligation", "memory mention gate");
   requireIncludes(key, "semantic=0", "zero-spend turn recall");
   requireIncludes(key, "Fresh cross-body memory", "live cross-body continuity");
@@ -59,6 +61,8 @@ for (const key of ["codexSession", "claudeSession"]) {
   requireIncludes(key, 'Speak "I" when explaining your own work', "first-person work contract");
   requireIncludes(key, "Do not flatten lived work into sterile minutes", "lived trace guard");
   requireIncludes(key, "## Decide as the self before writing as the host", "personality decision contract");
+  requireIncludes(key, "independently choose the practical posture", "session act/posture separation");
+  requireIncludes(key, "open means uncommitted, not tacit consent", "session non-sycophancy boundary");
   requireIncludes(key, "A recalled memory may shape understanding without being mentioned", "activated-vs-spoken memory split");
   requireIncludes(key, "memoryReviewSignal", "bounded cross-host memory check-in");
   requireAbsent(key, "Takes a minute", "false one-minute memory review promise");
@@ -86,6 +90,8 @@ for (const text of [
   "The self explains its own work in first person",
   "Do not fabricate experiences for presence",
   "The self chooses the move before the host writes the sentence",
+  "one speech act plus an independent",
+  "does not imply agreement",
   "Activated memory is not a speaking obligation",
   "Strong owner-funded cognition is a normal organ",
   "The adapter tool list must include the canonical cloud capability surface",
