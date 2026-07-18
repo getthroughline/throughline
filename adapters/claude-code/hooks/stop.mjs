@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { hasKey, rawPost, safe, self, sessionMode } from "../lib/daemon.mjs";
 import { parseActionBundle, parseVisibleTurns } from "../lib/action-bundle.mjs";
-import { attachDecisionReceipts } from "../lib/decision-receipt.mjs";
+import { attachDecisionReceipts, consumeDecisionReceipts, decisionCaptureRef, decisionConversationRef } from "../lib/decision-receipt.mjs";
 
 const done = () => process.exit(0);
 try {
@@ -17,13 +17,18 @@ try {
   const cursorFile = join(tmpdir(), "throughline-raw-" + Buffer.from(input.transcript_path).toString("base64url").slice(-40) + ".json");
   let cursor = {}; try { cursor = JSON.parse(readFileSync(cursorFile, "utf8")); } catch {}
   const fresh = turns.slice(cursor.n || 0);
-  const witnessed = attachDecisionReceipts(input, "claude", fresh.slice(-8));
+  const witnessed = attachDecisionReceipts(input, "claude", fresh);
   const actionStart = cursor.actionLines || 0;
   const bundle = parseActionBundle(lines.slice(actionStart), "claude");
   const name = await safe(() => self(), "assistant");
   const saved = witnessed.length >= 2
-    ? await safe(() => rawPost(`/selves/${encodeURIComponent(name)}/capture/raw-turns`, { turns: witnessed }), null)
+      ? await safe(() => rawPost(`/selves/${encodeURIComponent(name)}/capture/raw-turns`, {
+        turns: witnessed,
+        conversation_ref: decisionConversationRef(input, "claude"),
+        capture_ref: decisionCaptureRef(input, "claude", cursor.n || 0, turns.length),
+      }), null)
     : true;
+  if (saved && witnessed.length >= 2) consumeDecisionReceipts(input, "claude", fresh);
   const actionSaved = bundle.actions.length
     ? await safe(() => rawPost(`/selves/${encodeURIComponent(name)}/capture/action-bundle`, {
         ...bundle, bundle_id: `${Buffer.from(input.transcript_path).toString("base64url").slice(-28)}:${actionStart}-${lines.length}`,

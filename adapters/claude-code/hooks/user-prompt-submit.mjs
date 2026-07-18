@@ -10,7 +10,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { rawGet, safe } from "../lib/daemon.mjs";
-import { rememberDecisionReceipt } from "../lib/decision-receipt.mjs";
+import { canonicalDecisionSubject, rememberDecisionReceipt } from "../lib/decision-receipt.mjs";
 
 let hookInput = {};
 try { hookInput = JSON.parse(readFileSync(0, "utf8") || "{}"); } catch {}
@@ -87,14 +87,16 @@ try {
   let freshMemory = "";
   if (currentPrompt.length >= 2) {
     // Same deterministic act, posture and memory gate as every other body; Claude only realizes it.
-    const td = await safe(() => rawGet(`/selves/${encodeURIComponent(selfName)}/decision?q=${encodeURIComponent(currentPrompt.slice(0, 500))}`), null);
+    const decisionSubject = canonicalDecisionSubject(currentPrompt);
+    const td = await safe(() => rawGet(`/selves/${encodeURIComponent(selfName)}/decision?q=${encodeURIComponent(decisionSubject)}`), null);
     if (td?.receipt) rememberDecisionReceipt(hookInput, "claude", currentPrompt, td);
     if (td?.context) {
       freshMemory = "\n" + String(td.context);
     }
     else {
       // Backward compatibility with an older/self-hosted server.
-      const rr = await safe(() => rawGet(`/selves/${encodeURIComponent(selfName)}/recall?q=${encodeURIComponent(currentPrompt.slice(0, 500))}&k=4&semantic=0`), null);
+      const recallSubject = Array.from(decisionSubject).slice(0, 500).join("");
+      const rr = await safe(() => rawGet(`/selves/${encodeURIComponent(selfName)}/recall?q=${encodeURIComponent(recallSubject)}&k=4&semantic=0`), null);
       const rows = Array.isArray(rr?.events) ? rr.events : [];
       if (rows.length) freshMemory = "\nFresh cross-body memory for THIS prompt (may shape the answer; mention only when needed):\n" +
         rows.map((e) => `- [${String(e.ts ?? "").slice(0, 10)} · ${e.stream}] ${String(e.body?.content ?? e.body?.observation ?? "").slice(0, 220)}`).join("\n");

@@ -51,6 +51,8 @@ for (const key of ["codexStop", "claudeStop"]) {
   requireIncludes(key, "/capture/action-bundle", "bounded host action write-back");
   requireIncludes(key, "parseActionBundle", "shared host transcript parser");
   requireIncludes(key, "attachDecisionReceipts", "realized decision write-back");
+  requireIncludes(key, "decisionCaptureRef", "idempotent raw-turn batch identity");
+  requireIncludes(key, "consumeDecisionReceipts", "post-capture receipt commit");
 }
 for (const key of ["codexHooks", "claudeHooks"])
   requireIncludes(key, '"Stop"', "raw close hook registration");

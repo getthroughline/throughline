@@ -3,7 +3,14 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { parseActionBundle as parseCodex, parseVisibleTurns as turnsCodex } from "../adapters/codex/lib/action-bundle.mjs";
 import { parseActionBundle as parseClaude, parseVisibleTurns as turnsClaude } from "../adapters/claude-code/lib/action-bundle.mjs";
-import { attachDecisionReceipts, rememberDecisionReceipt } from "../adapters/codex/lib/decision-receipt.mjs";
+import {
+  attachDecisionReceipts,
+  canonicalDecisionSubject,
+  consumeDecisionReceipts,
+  decisionCaptureRef,
+  decisionConversationRef,
+  rememberDecisionReceipt,
+} from "../adapters/codex/lib/decision-receipt.mjs";
 
 const codexLines = [
   { type: "response_item", timestamp: "2026-07-16T01:00:00Z", payload: { type: "message", role: "user", content: [{ type: "input_text", text: "修一下" }] } },
@@ -61,13 +68,63 @@ assert.equal(longBorrowed.actions[0].name, "mcp__throughline__borrow_cortex", "b
 assert.equal(longBorrowed.actions.at(-1).name, "mcp__throughline__settle_cortex", "bounded traces keep settlement");
 
 const receiptInput = { session_id: `verify-${process.pid}-${Date.now()}` };
+assert.equal(decisionConversationRef(receiptInput, "codex"), decisionConversationRef(receiptInput, "codex"));
+assert.notEqual(decisionConversationRef(receiptInput, "codex"), decisionConversationRef(receiptInput, "claude"));
+assert.equal(decisionCaptureRef(receiptInput, "codex", 4, 8), `${decisionConversationRef(receiptInput, "codex")}:4-8`);
 assert.equal(rememberDecisionReceipt(receiptInput, "codex", "修一下", { id: "td_1", receipt: "signed-token" }), true);
 assert.deepEqual(attachDecisionReceipts(receiptInput, "codex", turnsCodex(codexLines, "codex")), [
   { role: "user", content: "修一下" },
   { role: "assistant", content: "修完并验证了。", decision_receipt: "signed-token" },
 ]);
+assert.deepEqual(attachDecisionReceipts(receiptInput, "codex", turnsCodex(codexLines, "codex")), [
+  { role: "user", content: "修一下" },
+  { role: "assistant", content: "修完并验证了。", decision_receipt: "signed-token" },
+], "a failed upload may retry with the same witness");
+assert.equal(consumeDecisionReceipts(receiptInput, "codex", turnsCodex(codexLines, "codex")), 1);
 assert.deepEqual(attachDecisionReceipts(receiptInput, "codex", turnsCodex(codexLines, "codex")), turnsCodex(codexLines, "codex"),
-  "a delivered receipt is consumed exactly once");
+  "a receipt is consumed only after durable capture succeeds");
+
+const progressInput = { session_id: `verify-progress-${process.pid}-${Date.now()}` };
+assert.equal(rememberDecisionReceipt(progressInput, "codex", "做个长任务", { id: "td_progress", receipt: "final-token" }), true);
+const progressTurns = [
+  { role: "user", content: "做个长任务" },
+  ...Array.from({ length: 10 }, (_, i) => ({ role: "assistant", content: `进度 ${i + 1}` })),
+  { role: "assistant", content: "最终结论。" },
+];
+assert.deepEqual(attachDecisionReceipts(progressInput, "codex", progressTurns), [
+  { role: "user", content: "做个长任务" },
+  { role: "assistant", content: "最终结论。", decision_receipt: "final-token" },
+], "progress updates cannot become the Self's durable position or evict its user subject");
+
+const exactInput = { session_id: `verify-exact-${process.pid}-${Date.now()}` };
+assert.equal(rememberDecisionReceipt(exactInput, "codex", "保留  两个空格", { id: "td_2", receipt: "exact-token" }), true);
+assert.deepEqual(attachDecisionReceipts(exactInput, "codex", [
+  { role: "user", content: "保留 两个空格" }, { role: "assistant", content: "不同输入。" },
+]), [
+  { role: "user", content: "保留 两个空格" }, { role: "assistant", content: "不同输入。" },
+], "receipt matching preserves the exact proposition instead of collapsing whitespace");
+
+const boundedInput = { session_id: `verify-bounded-${process.pid}-${Date.now()}` };
+const prefix = "x".repeat(2400);
+assert.equal(rememberDecisionReceipt(boundedInput, "codex", prefix + "first transport tail", { id: "td_3", receipt: "bounded-token" }), true);
+assert.deepEqual(attachDecisionReceipts(boundedInput, "codex", [
+  { role: "user", content: prefix + "second transport tail" }, { role: "assistant", content: "同一有界命题。" },
+]), [
+  { role: "user", content: prefix + "second transport tail" },
+  { role: "assistant", content: "同一有界命题。" },
+], "the bounded server proposition cannot attach to a different full host turn");
+assert.deepEqual(attachDecisionReceipts(boundedInput, "codex", [
+  { role: "user", content: prefix + "first transport tail" }, { role: "assistant", content: "原始完整命题。" },
+]), [
+  { role: "user", content: prefix + "first transport tail" },
+  { role: "assistant", content: "原始完整命题。", decision_receipt: "bounded-token" },
+], "server subject and full transcript identity are bound separately");
+
+const astral = "x".repeat(2399) + "😀" + "tail";
+assert.equal(Array.from(canonicalDecisionSubject(astral)).length, 2400);
+assert.equal(canonicalDecisionSubject(astral).endsWith("😀"), true,
+  "subject bounds count code points and cannot split a surrogate pair");
+assert.doesNotThrow(() => encodeURIComponent(canonicalDecisionSubject(astral)));
 
 assert.equal(
   readFileSync(new URL("../adapters/codex/lib/action-bundle.mjs", import.meta.url), "utf8"),

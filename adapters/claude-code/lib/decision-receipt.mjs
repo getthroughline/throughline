@@ -4,8 +4,12 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 
 const MAX_AGE_MS = 48 * 3_600_000;
+export const MAX_TURN_SUBJECT_LENGTH = 2400;
 const hash = (value) => createHash("sha256").update(String(value ?? "")).digest("hex");
-const promptHash = (value) => hash(String(value ?? "").replace(/\s+/g, " ").trim());
+export const canonicalDecisionSubject = (value) => Array.from(String(value ?? "").replace(/\0/g, "").trim())
+  .slice(0, MAX_TURN_SUBJECT_LENGTH).join("");
+const promptHash = (value) => hash(canonicalDecisionSubject(value));
+const transcriptHash = (value) => hash(String(value ?? "").replace(/\0/g, "").trim());
 
 function sessionKey(input, host) {
   const candidates = [
@@ -17,6 +21,12 @@ function sessionKey(input, host) {
   ];
   return hash(candidates.find((x) => String(x ?? "").trim()) || `${host}:${process.cwd()}`).slice(0, 32);
 }
+
+/** Stable causal room for one host transcript. Cross-body continuity may share memory, but feedback
+ * from this room may adjudicate only the answer it actually followed here. */
+export const decisionConversationRef = (input, host) => `${host}:${sessionKey(input, host)}`;
+export const decisionCaptureRef = (input, host, start, end) =>
+  `${decisionConversationRef(input, host)}:${Math.max(0, Number(start) || 0)}-${Math.max(0, Number(end) || 0)}`;
 
 const receiptPath = (input, host) => join(tmpdir(), `throughline-decisions-${sessionKey(input, host)}.json`);
 const readQueue = (input, host) => {
@@ -39,26 +49,63 @@ const writeQueue = (input, host, rows) => {
 export function rememberDecisionReceipt(input, host, prompt, turnDecision) {
   if (!turnDecision?.receipt || !turnDecision?.id || !String(prompt ?? "").trim()) return false;
   const rows = readQueue(input, host);
-  rows.push({ prompt: promptHash(prompt), id: String(turnDecision.id), receipt: String(turnDecision.receipt), at: Date.now() });
+  rows.push({
+    prompt: promptHash(prompt),
+    transcript: transcriptHash(prompt),
+    id: String(turnDecision.id),
+    receipt: String(turnDecision.receipt),
+    at: Date.now(),
+  });
   writeQueue(input, host, rows);
   return true;
 }
 
-/** Attach one witnessed decision only after its matching assistant words actually exist. */
-export function attachDecisionReceipts(input, host, turns) {
-  const rows = readQueue(input, host), used = new Set();
-  let pending = -1;
-  const out = (Array.isArray(turns) ? turns : []).map((turn) => {
+function witnessedExchanges(turns, rows) {
+  const used = new Set(), groups = [];
+  let pending = null;
+  const flush = () => {
+    if (!pending?.assistant) { pending = null; return; }
+    if (pending.receiptIndex >= 0) used.add(pending.receiptIndex);
+    groups.push(pending);
+    pending = null;
+  };
+  for (const turn of Array.isArray(turns) ? turns : []) {
     if (turn?.role === "user") {
+      flush();
       const wanted = promptHash(turn.content);
-      pending = rows.findIndex((row, index) => !used.has(index) && row.prompt === wanted);
-      return turn;
+      const exact = transcriptHash(turn.content);
+      pending = {
+        user: turn,
+        assistant: null,
+        receiptIndex: rows.findIndex((row, index) =>
+          !used.has(index) && row.prompt === wanted && row.transcript === exact),
+      };
+    } else if (turn?.role === "assistant" && pending) {
+      // Host progress updates are visible assistant messages too. The last one before the next user
+      // is the completed turn; only it may carry the canonical decision into durable self-history.
+      pending.assistant = turn;
     }
-    if (turn?.role !== "assistant" || pending < 0 || !rows[pending]) return turn;
-    const row = rows[pending];
-    used.add(pending); pending = -1;
-    return { ...turn, decision_receipt: row.receipt };
+  }
+  flush();
+  return { groups, used };
+}
+
+/** Attach receipts without consuming them. One complete exchange becomes two rows, so the server's
+ * eight-row inlet always retains the user subject even after a long run of progress updates. */
+export function attachDecisionReceipts(input, host, turns) {
+  const rows = readQueue(input, host);
+  const { groups } = witnessedExchanges(turns, rows);
+  return groups.slice(-4).flatMap((group) => {
+    const receipt = group.receiptIndex >= 0 ? rows[group.receiptIndex]?.receipt : null;
+    return [group.user, receipt ? { ...group.assistant, decision_receipt: receipt } : group.assistant];
   });
+}
+
+/** Commit the receipt queue only after raw-turn capture succeeds. Matched exchanges outside the
+ * bounded upload window are retired too, because the transcript cursor advances past them. */
+export function consumeDecisionReceipts(input, host, turns) {
+  const rows = readQueue(input, host);
+  const { used } = witnessedExchanges(turns, rows);
   if (used.size) writeQueue(input, host, rows.filter((_, index) => !used.has(index)));
-  return out;
+  return used.size;
 }
