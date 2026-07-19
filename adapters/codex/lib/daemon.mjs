@@ -140,7 +140,7 @@ export function sessionMode(defaultMode = "full") {
 }
 
 export async function self() {
-  if (cachedSelf) return cachedSelf;
+  if (cachedSelf && (cachedSource === "env" || cachedSource === "project" || cachedSource === "unbound-plugin")) return cachedSelf;
   if (process.env.THROUGHLINE_SELF) { cachedSource = "env"; return (cachedSelf = process.env.THROUGHLINE_SELF); }
   const proj = projectSelf();
   if (proj) { cachedSource = "project"; return (cachedSelf = proj); }
@@ -148,6 +148,7 @@ export async function self() {
   if (status) { cachedSource = "codex-status"; return (cachedSelf = status); }
   const currentStatus = currentCodexStatusSelf();
   if (currentStatus) { cachedSource = "codex-status"; return (cachedSelf = currentStatus); }
+  if (cachedSelf && cachedSource === "account-default") return cachedSelf;
   try {
     const res = await fetchWithTimeout(`${BASE}/config`, { headers: authHeaders() });
     if (res.ok) {
