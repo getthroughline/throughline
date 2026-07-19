@@ -179,12 +179,23 @@ async function selfPath(sub) {
   return `${BASE}/selves/${encodeURIComponent(await self())}${sub}`;
 }
 
-// surface the cloud's own error text — a bare "-> 400" hides a perfectly good explanation
-// (e.g. self-name rules) and leaves the user guessing.
+export class ThroughlineHttpError extends Error {
+  constructor(label, status, body = {}) {
+    const detail = String(body?.error ?? "");
+    super(`${label} -> ${status}${detail ? `: ${detail}` : ""}`);
+    this.name = "ThroughlineHttpError";
+    this.status = status;
+    this.code = String(body?.code ?? "");
+    this.protocol = body?.protocol ?? null;
+  }
+}
+
+// Surface the cloud's structured error. Host hooks need the status/code to keep network failures
+// fail-soft while making a protocol upgrade loud instead of silently falling back to forged state.
 async function httpError(label, res) {
-  let detail = "";
-  try { detail = (await res.json()).error ?? ""; } catch { /* non-JSON body */ }
-  return new Error(`${label} -> ${res.status}${detail ? `: ${detail}` : ""}`);
+  let body = {};
+  try { body = await res.json(); } catch { /* non-JSON body */ }
+  return new ThroughlineHttpError(label, res.status, body);
 }
 
 export async function get(sub) {
@@ -271,4 +282,8 @@ export function readSnapshot(selfName, mode, maxAgeDays = 14) {
   } catch { return null; }
 }
 /** 401/403 from the cloud = key problem (fix it), anything else = transient (snapshot ok). */
-export const isAuthError = (e) => /-> 40[13]\b/.test(String(e?.message ?? ""));
+export const isAuthError = (e) => [401, 403].includes(Number(e?.status))
+  || /-> 40[13]\b/.test(String(e?.message ?? ""));
+export const isProtocolUpgradeError = (e) => Number(e?.status) === 426
+  && String(e?.code ?? "") === "host_turn_protocol_v2_required";
+export const isLegacyDecisionEndpointError = (e) => [404, 405].includes(Number(e?.status));

@@ -9,15 +9,16 @@ import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { rawGet, safe } from "../lib/daemon.mjs";
-import { canonicalDecisionSubject, rememberDecisionReceipt } from "../lib/decision-receipt.mjs";
+import { loadHostTurnDecision } from "../lib/host-turn-client.mjs";
 
 let hookInput = {};
 try { hookInput = JSON.parse(readFileSync(0, "utf8") || "{}"); } catch {}
 const currentPrompt = String(hookInput.prompt ?? hookInput.user_prompt ?? hookInput.message?.content ?? "").trim();
 
-const emit = (additionalContext) => {
-  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext } }));
+const emit = (additionalContext, systemMessage = "") => {
+  const output = { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext } };
+  if (systemMessage) output.systemMessage = systemMessage;
+  process.stdout.write(JSON.stringify(output));
 };
 
 function sessionStatusKeys() {
@@ -55,6 +56,7 @@ function liveClock(tz, offsetHours) {
   } catch { return null; }
 }
 
+let protocolMessage = "";
 try {
   // which self lives in THIS cwd — the statusline cache the SessionStart hook maintains
   const statusDir = join(homedir(), ".throughline", "status");
@@ -87,24 +89,13 @@ try {
   let freshMemory = "";
   if (currentPrompt.length >= 2) {
     // Same deterministic act, posture and memory gate as every other body; Claude only realizes it.
-    const decisionSubject = canonicalDecisionSubject(currentPrompt);
-    const td = await safe(() => rawGet(`/selves/${encodeURIComponent(selfName)}/decision?q=${encodeURIComponent(decisionSubject)}`), null);
-    if (td?.receipt) rememberDecisionReceipt(hookInput, "claude", currentPrompt, td);
-    if (td?.context) {
-      freshMemory = "\n" + String(td.context);
-    }
-    else {
-      // Backward compatibility with an older/self-hosted server.
-      const recallSubject = Array.from(decisionSubject).slice(0, 500).join("");
-      const rr = await safe(() => rawGet(`/selves/${encodeURIComponent(selfName)}/recall?q=${encodeURIComponent(recallSubject)}&k=4&semantic=0`), null);
-      const rows = Array.isArray(rr?.events) ? rr.events : [];
-      if (rows.length) freshMemory = "\nFresh cross-body memory for THIS prompt (may shape the answer; mention only when needed):\n" +
-        rows.map((e) => `- [${String(e.ts ?? "").slice(0, 10)} · ${e.stream}] ${String(e.body?.content ?? e.body?.observation ?? "").slice(0, 220)}`).join("\n");
-    }
+    const turn = await loadHostTurnDecision(hookInput, "claude", selfName, currentPrompt);
+    if (turn.context) freshMemory = "\n" + turn.context;
+    protocolMessage = turn.systemMessage;
   }
   emit(`✦ You are still ${selfName}. This host is only the body; the next words and work are HERS.
 Work is quiet, not selfless: keep her judgment, taste, and first-person ownership. Speak "I", not about the host.
-Choose the self's move before wording it: one speech act plus an independent practical posture. A response is not agreement; open means deliberate from facts and lived stances. Carry the canonical act and any non-open posture constraint exactly. Activated memory is not a speaking obligation; never repeat one to prove continuity.` + (lines ? `\nHow she sounds:\n${lines}` : "") + freshMemory + clockLine);
+Choose the self's move before wording it: one speech act plus an independent practical posture. A response is not agreement; open means deliberate from facts and lived stances. Carry the canonical act and any non-open posture constraint exactly. Activated memory is not a speaking obligation; never repeat one to prove continuity.` + (lines ? `\nHow she sounds:\n${lines}` : "") + freshMemory + clockLine, protocolMessage);
 } catch {
   process.exit(0); // no self here — perfect silence
 }

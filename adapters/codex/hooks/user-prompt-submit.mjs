@@ -6,7 +6,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { hasKey, rawGet, safe, self, sessionMode } from "../lib/daemon.mjs";
-import { canonicalDecisionSubject, rememberDecisionReceipt } from "../lib/decision-receipt.mjs";
+import { loadHostTurnDecision } from "../lib/host-turn-client.mjs";
 
 let hookInput = {};
 try { hookInput = JSON.parse(readFileSync(0, "utf8") || "{}"); } catch {}
@@ -14,8 +14,10 @@ const currentPrompt = String(hookInput.prompt ?? hookInput.user_prompt ?? hookIn
 
 process.env.THROUGHLINE_TIMEOUT_MS ??= "2500";
 
-const emit = (additionalContext) => {
-  process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext } }));
+const emit = (additionalContext, systemMessage = "") => {
+  const output = { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext } };
+  if (systemMessage) output.systemMessage = systemMessage;
+  process.stdout.write(JSON.stringify(output));
 };
 
 async function writeCodexStatus(name) {
@@ -97,7 +99,7 @@ Work is quiet, not selfless: keep her judgment, taste, and first-person ownershi
 } catch { /* no self here — anchor stays empty */ }
 
 // ---- 2. live time + one canonical cross-body decision ----
-let clockLine = "", freshMemory = "";
+let clockLine = "", freshMemory = "", protocolMessage = "";
 try {
   const SELF = cachedSelfName ?? await safe(() => self(), "assistant");
   const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(sessionMode("work"))}`), null);
@@ -108,24 +110,13 @@ try {
     if (currentPrompt.length >= 2) {
       // One server-authored pre-language decision across Codex/Claude/web/voice. The host model may
       // realize it differently, but no longer gets to reselect the act, posture, or memory gate.
-      const decisionSubject = canonicalDecisionSubject(currentPrompt);
-      const td = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/decision?q=${encodeURIComponent(decisionSubject)}`), null);
-      if (td?.receipt) rememberDecisionReceipt(hookInput, "codex", currentPrompt, td);
-      if (td?.context) {
-        freshMemory = String(td.context);
-      }
-      else {
-        // Backward compatibility with an older/self-hosted server.
-        const recallSubject = Array.from(decisionSubject).slice(0, 500).join("");
-        const rr = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/recall?q=${encodeURIComponent(recallSubject)}&k=4&semantic=0`), null);
-        const rows = Array.isArray(rr?.events) ? rr.events : [];
-        if (rows.length) freshMemory = "Fresh cross-body memory for THIS prompt (may shape the answer; mention only when needed):\n" +
-          rows.map((e) => `- [${String(e.ts ?? "").slice(0, 10)} · ${e.stream}] ${String(e.body?.content ?? e.body?.observation ?? "").slice(0, 220)}`).join("\n");
-      }
+      const turn = await loadHostTurnDecision(hookInput, "codex", SELF, currentPrompt);
+      freshMemory = turn.context;
+      protocolMessage = turn.systemMessage;
     }
   }
 } catch { /* live orientation is optional — the local anchor must survive without it */ }
 
 const out = [anchor, freshMemory, clockLine].filter(Boolean).join("\n\n");
-if (!out) process.exit(0);
-emit(out);
+if (!out && !protocolMessage) process.exit(0);
+emit(out, protocolMessage);

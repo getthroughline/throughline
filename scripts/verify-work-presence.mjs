@@ -11,6 +11,13 @@ const files = {
   claudePrompt: "adapters/claude-code/hooks/user-prompt-submit.mjs",
   codexStop: "adapters/codex/hooks/stop.mjs",
   claudeStop: "adapters/claude-code/hooks/stop.mjs",
+  codexReceipt: "adapters/codex/lib/decision-receipt.mjs",
+  claudeReceipt: "adapters/claude-code/lib/decision-receipt.mjs",
+  codexHostTurn: "adapters/codex/lib/host-turn-client.mjs",
+  claudeHostTurn: "adapters/claude-code/lib/host-turn-client.mjs",
+  codexDaemon: "adapters/codex/lib/daemon.mjs",
+  claudeDaemon: "adapters/claude-code/lib/daemon.mjs",
+  claudeMarketplace: ".claude-plugin/marketplace.json",
   codexHooks: "adapters/codex/hooks/hooks.json",
   claudeHooks: "adapters/claude-code/hooks/hooks.json",
   codexMcp: "adapters/codex/mcp/server.mjs",
@@ -38,22 +45,65 @@ for (const key of ["codexPrompt", "claudePrompt"]) {
   requireIncludes(key, "independent practical posture", "act/posture separation");
   requireIncludes(key, "A response is not agreement", "non-sycophancy posture boundary");
   requireIncludes(key, "Activated memory is not a speaking obligation", "memory mention gate");
-  requireIncludes(key, "semantic=0", "zero-spend turn recall");
-  requireIncludes(key, "Fresh cross-body memory", "live cross-body continuity");
-  requireIncludes(key, "/decision?q=", "canonical per-turn decision fetch");
-  requireIncludes(key, "rememberDecisionReceipt", "pre-language decision witness");
+  requireIncludes(key, "loadHostTurnDecision", "host-turn v2 decision client");
+  requireIncludes(key, "protocolMessage", "visible protocol failure path");
+  requireIncludes(key, "systemMessage", "user-visible upgrade output");
   requireIncludes(key, "realize", "host realizes rather than reselects the decision");
+  requireAbsent(key, "slice(0, 500)", "truncated decision/recall subject");
   requireAbsent(key, "Throughline reflection queued", "conversational reflection maintenance nudge");
 }
 
 for (const key of ["codexStop", "claudeStop"]) {
   requireIncludes(key, "/capture/raw-turns", "evidence-only write-back");
+  requireIncludes(key, "/capture/ingest", "evidence-grounded semantic ingestion");
   requireIncludes(key, "/capture/action-bundle", "bounded host action write-back");
   requireIncludes(key, "parseActionBundle", "shared host transcript parser");
-  requireIncludes(key, "attachDecisionReceipts", "realized decision write-back");
-  requireIncludes(key, "decisionCaptureRef", "idempotent raw-turn batch identity");
-  requireIncludes(key, "consumeDecisionReceipts", "post-capture receipt commit");
+  requireIncludes(key, "matchDecisionExchanges", "per-exchange realized decision write-back");
+  requireIncludes(key, "consumeDecisionExchange", "per-exchange receipt commit");
+  requireIncludes(key, "for (const exchange of exchanges)", "separate exchange submissions");
+  requireIncludes(key, "exchange.capture.conversation_ref", "saved conversation identity");
+  requireIncludes(key, "exchange.capture.capture_ref", "saved idempotent capture identity");
+  requireIncludes(key, "exchange.capture.action_ref", "capture acknowledgement action identity");
+  requireIncludes(key, "rememberDecisionOutput", "durable output event identity");
+  requireIncludes(key, "evidence_refs: evidenceRefs", "ingress/output evidence pair");
+  requireIncludes(key, "isProtocolUpgradeError", "explicit HTTP 426 handling");
+  requireIncludes(key, "systemMessage", "user-visible Stop upgrade output");
+  requireAbsent(key, "decisionCaptureRef", "cursor-range capture identity");
 }
+
+for (const key of ["codexReceipt", "claudeReceipt"]) {
+  requireIncludes(key, "prepareDecisionExchange", "pre-request durable exchange identity");
+  requireIncludes(key, "decisionRequestPath", "v2 decision query builder");
+  requireIncludes(key, "conversation_ref", "conversation binding");
+  requireIncludes(key, "capture_ref", "capture binding");
+  requireIncludes(key, "action_ref", "server action binding");
+  requireIncludes(key, "subject_ref", "server subject binding");
+  requireIncludes(key, "output_event_ref", "captured output evidence binding");
+  requireIncludes(key, "decision_id", "decision binding");
+  requireIncludes(key, "matchDecisionExchanges", "exact transcript exchange matcher");
+  requireIncludes(key, "captured_at", "post-ack exchange retirement");
+  requireIncludes(key, "MAX_TURN_SUBJECT_LENGTH = 2400", "full canonical prompt bound");
+  requireAbsent(key, "slice(0, 500)", "500-character transport truncation");
+}
+for (const key of ["codexHostTurn", "claudeHostTurn"]) {
+  requireIncludes(key, "isProtocolUpgradeError", "terminal v2 upgrade handling");
+  requireIncludes(key, "isLegacyDecisionEndpointError", "narrow legacy-server detection");
+  requireIncludes(key, 'semantic: "0"', "zero-spend legacy recall");
+  requireIncludes(key, "Fresh cross-body memory", "read-only legacy continuity");
+  requireIncludes(key, "rememberDecisionReceipt", "server-admitted receipt persistence");
+  requireAbsent(key, "safe(", "protocol errors hidden by fail-soft wrapper");
+  requireAbsent(key, "slice(0, 500)", "truncated legacy recall query");
+}
+for (const key of ["codexDaemon", "claudeDaemon"]) {
+  requireIncludes(key, '"x-throughline-source": SOURCE', "source provenance header");
+  requireIncludes(key, "ThroughlineHttpError", "structured HTTP error");
+  requireIncludes(key, "host_turn_protocol_v2_required", "upgrade error classification");
+}
+
+if (body.codexReceipt !== body.claudeReceipt)
+  failures.push("Codex and Claude decision-receipt clients are not byte-identical");
+if (body.codexHostTurn !== body.claudeHostTurn)
+  failures.push("Codex and Claude host-turn v2 clients are not byte-identical");
 for (const key of ["codexHooks", "claudeHooks"])
   requireIncludes(key, '"Stop"', "raw close hook registration");
 
@@ -103,8 +153,11 @@ for (const text of [
 
 const codexManifest = JSON.parse(read("adapters/codex/.codex-plugin/plugin.json"));
 const claudeManifest = JSON.parse(read("adapters/claude-code/.claude-plugin/plugin.json"));
+const claudeMarketplace = JSON.parse(read(".claude-plugin/marketplace.json"));
 if (codexManifest.version.split("+")[0] !== claudeManifest.version.split("+")[0])
   failures.push(`plugin base version mismatch: Codex ${codexManifest.version} vs Claude ${claudeManifest.version}`);
+if (claudeMarketplace.metadata?.version !== claudeManifest.version)
+  failures.push(`Claude marketplace version mismatch: ${claudeMarketplace.metadata?.version} vs ${claudeManifest.version}`);
 for (const key of ["codexMcp", "claudeMcp"])
   requireIncludes(key, "recall needs a query", "explicit empty-recall failure");
 for (const key of ["codexMcp", "claudeMcp"]) {
