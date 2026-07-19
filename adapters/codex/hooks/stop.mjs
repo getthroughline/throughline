@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { hasKey, isProtocolUpgradeError, rawPost, safe, self, sessionDisabled } from "../lib/daemon.mjs";
+import { bindCodexRequest, hasKey, isProtocolUpgradeError, rawPost, safe, self, sessionDisabled } from "../lib/daemon.mjs";
 import { parseActionBundle, parseVisibleTurns } from "../lib/action-bundle.mjs";
 import { consumeDecisionExchange, matchDecisionExchanges, rememberDecisionOutput } from "../lib/decision-receipt.mjs";
 
@@ -17,6 +17,7 @@ try {
   if ((!hasKey() && !process.env.THROUGHLINE_URL) || sessionDisabled()) done();
   const input = JSON.parse(readFileSync(0, "utf8") || "{}");
   if (input.stop_hook_active || !input.transcript_path || !existsSync(input.transcript_path)) done();
+  await bindCodexRequest(input);
   const lines = readFileSync(input.transcript_path, "utf8").trim().split("\n");
   const turns = parseVisibleTurns(lines, "codex");
   const cursorFile = join(tmpdir(), "throughline-raw-" + Buffer.from(input.transcript_path).toString("base64url").slice(-40) + ".json");

@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { hasKey, rawGet, safe, self, sessionDisabled } from "../lib/daemon.mjs";
+import { bindCodexRequest, codexThreadId, hasKey, rawGet, safe, self, sessionDisabled } from "../lib/daemon.mjs";
 import { loadHostTurnDecision } from "../lib/host-turn-client.mjs";
 
 let hookInput = {};
@@ -27,8 +27,9 @@ async function writeCodexStatus(name) {
     const status = JSON.stringify({ self: name, cwd: process.cwd(), ts: Date.now() });
     writeFileSync(join(statusDir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
     writeFileSync(join(statusDir, "codex-current.json"), status);
-    if (process.env.CODEX_THREAD_ID)
-      writeFileSync(join(statusDir, `thread-${String(process.env.CODEX_THREAD_ID).replace(/[^\w.-]/g, "_")}.json`), status);
+    const threadId = codexThreadId(hookInput);
+    if (threadId)
+      writeFileSync(join(statusDir, `thread-${String(threadId).replace(/[^\w.-]/g, "_")}.json`), status);
   } catch { /* presence is optional */ }
 }
 
@@ -60,6 +61,7 @@ function liveClock(tz, offsetHours) {
 if (!hasKey() && !process.env.THROUGHLINE_URL) process.exit(0);
 if (sessionDisabled()) process.exit(0);
 
+await bindCodexRequest(hookInput);
 await writeCodexStatus(await safe(() => self(), "assistant"));
 
 // ---- 1. the voice anchor: local files only (status cache → snapshot), zero network ----
@@ -67,8 +69,9 @@ let anchor = "";
 let cachedSelfName = null;
 try {
   const statusDir = join(homedir(), ".throughline", "status");
+  const threadId = codexThreadId(hookInput);
   const statusFiles = [
-    process.env.CODEX_THREAD_ID ? join(statusDir, `thread-${String(process.env.CODEX_THREAD_ID).replace(/[^\w.-]/g, "_")}.json`) : "",
+    threadId ? join(statusDir, `thread-${String(threadId).replace(/[^\w.-]/g, "_")}.json`) : "",
     join(statusDir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"),
   ].filter(Boolean);
   let status = null;

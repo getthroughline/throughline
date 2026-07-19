@@ -4,6 +4,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 const CLOUD = "https://getthroughline.ai";
 const BASE = process.env.THROUGHLINE_URL ?? CLOUD;
@@ -22,13 +23,19 @@ function apiKey() {
 // and the fidelity gate (weak substrates lose auto-save). Override via env if embedding elsewhere.
 const SOURCE = process.env.THROUGHLINE_SOURCE ?? "codex-plugin";
 const MODEL = process.env.THROUGHLINE_MODEL ?? process.env.ANTHROPIC_MODEL ?? "";
-const RAW_SESSION = process.env.THROUGHLINE_SESSION_ID ?? process.env.CODEX_THREAD_ID ?? `process:${randomUUID()}`;
-const SESSION = createHash("sha256").update(`${SOURCE}\0${RAW_SESSION}`).digest("hex").slice(0, 40);
+const PROCESS_SESSION = `process:${randomUUID()}`;
+const requestScope = new AsyncLocalStorage();
+const scope = () => requestScope.getStore() ?? null;
+const rawSession = () => process.env.THROUGHLINE_SESSION_ID
+  ?? scope()?.threadId
+  ?? process.env.CODEX_THREAD_ID
+  ?? PROCESS_SESSION;
+const session = () => createHash("sha256").update(`${SOURCE}\0${rawSession()}`).digest("hex").slice(0, 40);
 function authHeaders(extra = {}) {
   const key = apiKey();
   return {
     "x-throughline-source": SOURCE,
-    "x-throughline-session": SESSION,
+    "x-throughline-session": session(),
     ...(MODEL ? { "x-throughline-model": MODEL } : {}),
     ...(key ? { authorization: `Bearer ${key}` } : {}),
     ...extra,
@@ -55,11 +62,11 @@ async function fetchWithTimeout(url, init = {}) {
 // `selfSource()` reports which rule won, so the session hook can tell the user.
 import { dirname, resolve } from "node:path";
 let cachedSelf, cachedSource;
-function projectSelf() {
-  try { return projectSelfUnsafe(); } catch { return null; }
+function projectSelf(cwd = process.cwd()) {
+  try { return projectSelfUnsafe(cwd); } catch { return null; }
 }
-function projectSelfUnsafe() {
-  let dir = process.cwd();
+function projectSelfUnsafe(cwd = process.cwd()) {
+  let dir = resolve(cwd);
   for (let i = 0; i < 12; i++) {
     const f = resolve(dir, ".throughline");
     // must be a FILE: ~/.throughline (the data directory) shares the name — skip dirs, keep walking
@@ -75,38 +82,133 @@ function projectSelfUnsafe() {
   return null;
 }
 
-function codexStatusSelf() {
+function statusFileSelf(path) {
   try {
-    const dir = join(homedir(), ".throughline", "status");
-    const thread = process.env.CODEX_THREAD_ID;
-    if (!thread) return null;
-    const p = join(dir, `thread-${String(thread).replace(/[^\w.-]/g, "_")}.json`);
-    const st = statSync(p);
+    const st = statSync(path);
     if (Date.now() - st.mtimeMs > 7 * 86_400_000) return null;
-    const status = JSON.parse(readFileSync(p, "utf8"));
+    const status = JSON.parse(readFileSync(path, "utf8"));
     return typeof status?.self === "string" && status.self ? status.self : null;
   } catch {
     return null;
   }
 }
 
-function currentCodexStatusSelf() {
-  try {
-    const p = join(homedir(), ".throughline", "status", "codex-current.json");
-    const st = statSync(p);
-    if (Date.now() - st.mtimeMs > 6 * 60_000) return null;
-    const status = JSON.parse(readFileSync(p, "utf8"));
-    return typeof status?.self === "string" && status.self ? status.self : null;
-  } catch {
-    return null;
+const codexStatusDir = () => process.env.THROUGHLINE_CODEX_STATUS_DIR
+  ? resolve(process.env.THROUGHLINE_CODEX_STATUS_DIR)
+  : join(homedir(), ".throughline", "status");
+
+function codexStatusSelf(thread = process.env.CODEX_THREAD_ID) {
+  if (!thread) return null;
+  return statusFileSelf(join(codexStatusDir(), `thread-${String(thread).replace(/[^\w.-]/g, "_")}.json`));
+}
+
+function workspaceStatusSelf(cwd) {
+  if (!cwd) return null;
+  const key = createHash("sha256").update(resolve(cwd)).digest("hex").slice(0, 16);
+  return statusFileSelf(join(codexStatusDir(), `${key}.json`));
+}
+
+function metadataObjects(value, out = [], seen = new Set()) {
+  if (!value || typeof value !== "object" || seen.has(value) || out.length >= 24) return out;
+  seen.add(value);
+  out.push(value);
+  for (const key of ["_meta", "meta", "params", "x-codex-turn-metadata", "turn_metadata", "turnMetadata"]) {
+    const child = value[key];
+    if (child && typeof child === "object") metadataObjects(child, out, seen);
   }
+  return out;
+}
+
+export function codexThreadId(metadata = {}) {
+  for (const item of metadataObjects(metadata)) {
+    for (const key of ["threadId", "thread_id", "sessionId", "session_id", "conversationId", "conversation_id"]) {
+      const value = String(item?.[key] ?? "").trim();
+      if (value) return value;
+    }
+  }
+  return String(process.env.CODEX_THREAD_ID ?? "").trim() || null;
+}
+
+export function codexWorkspacePaths(metadata = {}) {
+  const paths = [];
+  for (const item of metadataObjects(metadata)) {
+    const workspaces = item?.workspaces;
+    if (workspaces && typeof workspaces === "object" && !Array.isArray(workspaces))
+      paths.push(...Object.keys(workspaces));
+    for (const key of ["cwd", "workspace", "workspacePath", "workspace_path"]) {
+      const value = String(item?.[key] ?? "").trim();
+      if (value.startsWith("/")) paths.push(value);
+    }
+  }
+  if (!pluginRuntime(process.cwd())) paths.push(process.cwd());
+  return [...new Set(paths.map((p) => resolve(p)))];
+}
+
+async function accountDefaultSelf() {
+  try {
+    const res = await fetchWithTimeout(`${BASE}/config`, { headers: authHeaders() });
+    if (res.ok) {
+      const cfg = await res.json();
+      if (cfg.default_self) return String(cfg.default_self);
+    }
+  } catch { /* unresolved below */ }
+  return null;
+}
+
+async function requestBinding(metadata = {}) {
+  if (process.env.THROUGHLINE_SELF) return { self: process.env.THROUGHLINE_SELF, source: "env" };
+  const threadId = codexThreadId(metadata);
+  const status = codexStatusSelf(threadId);
+  if (status) return { self: status, source: "codex-status" };
+  for (const cwd of codexWorkspacePaths(metadata)) {
+    const project = projectSelf(cwd);
+    if (project) return { self: project, source: "project" };
+    const workspace = workspaceStatusSelf(cwd);
+    if (workspace) return { self: workspace, source: "codex-workspace-status" };
+  }
+  const account = await accountDefaultSelf();
+  if (account) return { self: account, source: "account-default" };
+  return { self: "assistant", source: pluginRuntime() ? "unbound-plugin" : "fallback" };
+}
+
+/** Bind one Codex request to its own thread/workspace. The MCP process is shared, but identity is
+ * not: every nested cloud read/write inherits this async-local scope and provenance session. */
+export async function withCodexRequest(metadata, fn) {
+  const context = {
+    threadId: codexThreadId(metadata),
+    workspacePaths: codexWorkspacePaths(metadata),
+    self: null,
+    source: null,
+  };
+  return requestScope.run(context, async () => {
+    const binding = await requestBinding(metadata);
+    context.self = binding.self;
+    context.source = binding.source;
+    return fn();
+  });
+}
+
+/** Hooks are one-shot processes, so entering one request scope for the rest of the process is safe
+ * and lets all subsequent helper calls share the same binding without wrapping the whole script. */
+export async function bindCodexRequest(metadata = {}) {
+  const context = {
+    threadId: codexThreadId(metadata),
+    workspacePaths: codexWorkspacePaths(metadata),
+    self: null,
+    source: null,
+  };
+  requestScope.enterWith(context);
+  const binding = await requestBinding(metadata);
+  context.self = binding.self;
+  context.source = binding.source;
+  return binding;
 }
 
 export function pluginRuntime(cwd = process.cwd()) {
   return /\/\.codex\/plugins\/cache\/throughline\/throughline\//.test(cwd);
 }
 export function hasKey() { return !!apiKey(); }
-export function selfSource() { return cachedSource ?? "default"; }
+export function selfSource() { return scope()?.source ?? cachedSource ?? "default"; }
 
 function projectFileLines() {
   try { return projectFileLinesUnsafe(); } catch { return null; }
@@ -129,27 +231,16 @@ export function sessionDisabled() {
 }
 
 export async function self() {
+  if (scope()?.self) return scope().self;
   if (cachedSelf && (cachedSource === "env" || cachedSource === "project" || cachedSource === "unbound-plugin")) return cachedSelf;
   if (process.env.THROUGHLINE_SELF) { cachedSource = "env"; return (cachedSelf = process.env.THROUGHLINE_SELF); }
   const proj = projectSelf();
   if (proj) { cachedSource = "project"; return (cachedSelf = proj); }
   const status = codexStatusSelf();
   if (status) { cachedSource = "codex-status"; return (cachedSelf = status); }
-  // `codex-current.json` is a bridge for the background MCP process, whose cwd is the
-  // installed plugin cache and therefore cannot discover the foreground project. A hook
-  // already runs in the real project cwd; letting it consume this account-global file makes
-  // concurrent Codex threads overwrite one another, then persist the wrong self into the
-  // current project's status on the next prompt.
-  const currentStatus = pluginRuntime() ? currentCodexStatusSelf() : null;
-  if (currentStatus) { cachedSource = "codex-status"; return (cachedSelf = currentStatus); }
   if (cachedSelf && cachedSource === "account-default") return cachedSelf;
-  try {
-    const res = await fetchWithTimeout(`${BASE}/config`, { headers: authHeaders() });
-    if (res.ok) {
-      const cfg = await res.json();
-      if (cfg.default_self) { cachedSource = "account-default"; return (cachedSelf = cfg.default_self); }
-    }
-  } catch { /* unreachable — fall through */ }
+  const account = await accountDefaultSelf();
+  if (account) { cachedSource = "account-default"; return (cachedSelf = account); }
   // MCP servers start with the installed plugin cache as cwd, so project discovery cannot work
   // there. That is not evidence that the account has no self: use its default whenever the cloud
   // is reachable. Only fail closed to the neutral assistant when neither a session binding nor the
@@ -166,7 +257,14 @@ export async function self() {
  * deliberate pins and win; return false so the caller can tell the user the session stays pinned.
  */
 export function rebindSelf(name) {
-  if (cachedSource === "env" || cachedSource === "project" || cachedSource === "codex-status" || cachedSource === "unbound-plugin") return false;
+  const active = scope();
+  if (active) {
+    if (["env", "project", "codex-status", "codex-workspace-status", "unbound-plugin"].includes(active.source)) return false;
+    active.self = name || null;
+    if (name) active.source = "account-default";
+    return true;
+  }
+  if (cachedSource === "env" || cachedSource === "project" || cachedSource === "codex-status" || cachedSource === "codex-workspace-status" || cachedSource === "unbound-plugin") return false;
   cachedSelf = name || undefined; // undefined → next self() re-resolves from account default
   if (name) cachedSource = "account-default";
   return true;

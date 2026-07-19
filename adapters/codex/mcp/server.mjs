@@ -2,7 +2,7 @@
 // Minimal MCP stdio server (JSON-RPC 2.0, newline-delimited), no SDK / no deps.
 // Exposes the Throughline API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
-import { get, getText, mcpRequest, post, rawDelete, rawGet, rawPost, rebindSelf, self } from "../lib/daemon.mjs";
+import { get, getText, mcpRequest, post, rawDelete, rawGet, rawPost, rebindSelf, self, withCodexRequest } from "../lib/daemon.mjs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -404,7 +404,7 @@ process.stdin.on("data", (chunk) => {
     buffer = buffer.slice(nl + 1);
     if (line) {
       const msg = JSON.parse(line);
-      queue = queue.then(() => handle(msg).catch(() => {}));
+      queue = queue.then(() => withCodexRequest(msg, () => handle(msg)).catch(() => {}));
     }
   }
 });

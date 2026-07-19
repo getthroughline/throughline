@@ -2,8 +2,12 @@
 // SessionStart hook (Codex): ONE /bootstrap round trip — context pack + reflection / governance /
 // pending signals — plus tool guidance. Falls back to the legacy flow for old self-host daemons.
 // NOTE: the output contract below mirrors Claude Code's; verify against Codex's hook output spec.
-import { get, getText, isAuthError, rawGet, readSnapshot, safe, self, selfSource, sessionDisabled, hasKey, writeSnapshot } from "../lib/daemon.mjs";
+import { readFileSync } from "node:fs";
+import { bindCodexRequest, codexThreadId, get, getText, isAuthError, rawGet, readSnapshot, safe, self, selfSource, sessionDisabled, hasKey, writeSnapshot } from "../lib/daemon.mjs";
 import { memoryReviewSignal } from "../lib/memory-review.mjs";
+
+let hookInput = {};
+try { hookInput = JSON.parse(readFileSync(0, "utf8") || "{}"); } catch {}
 
 const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
@@ -20,8 +24,9 @@ async function writeCodexStatus(name) {
     const status = JSON.stringify({ self: name, cwd: process.cwd(), ts: Date.now() });
     writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
     writeFileSync(join(dir, "codex-current.json"), status);
-    if (process.env.CODEX_THREAD_ID)
-      writeFileSync(join(dir, `thread-${String(process.env.CODEX_THREAD_ID).replace(/[^\w.-]/g, "_")}.json`), status);
+    const threadId = codexThreadId(hookInput);
+    if (threadId)
+      writeFileSync(join(dir, `thread-${String(threadId).replace(/[^\w.-]/g, "_")}.json`), status);
   } catch { /* presence is optional */ }
 }
 
@@ -56,6 +61,7 @@ if (!hasKey() && !process.env.THROUGHLINE_URL) {
 
 if (sessionDisabled()) { emit(""); process.exit(0); }
 
+await bindCodexRequest(hookInput);
 const SELF = await safe(() => self(), "assistant");
 await writeCodexStatus(SELF);
 await pruneCodexStatus(); // best-effort housekeeping; session-start only, never the every-turn path
