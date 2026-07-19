@@ -102,8 +102,8 @@ function currentCodexStatusSelf() {
   }
 }
 
-function pluginRuntime() {
-  return /\/\.codex\/plugins\/cache\/throughline\/throughline\//.test(process.cwd());
+export function pluginRuntime(cwd = process.cwd()) {
+  return /\/\.codex\/plugins\/cache\/throughline\/throughline\//.test(cwd);
 }
 export function hasKey() { return !!apiKey(); }
 export function selfSource() { return cachedSource ?? "default"; }
@@ -135,7 +135,12 @@ export async function self() {
   if (proj) { cachedSource = "project"; return (cachedSelf = proj); }
   const status = codexStatusSelf();
   if (status) { cachedSource = "codex-status"; return (cachedSelf = status); }
-  const currentStatus = currentCodexStatusSelf();
+  // `codex-current.json` is a bridge for the background MCP process, whose cwd is the
+  // installed plugin cache and therefore cannot discover the foreground project. A hook
+  // already runs in the real project cwd; letting it consume this account-global file makes
+  // concurrent Codex threads overwrite one another, then persist the wrong self into the
+  // current project's status on the next prompt.
+  const currentStatus = pluginRuntime() ? currentCodexStatusSelf() : null;
   if (currentStatus) { cachedSource = "codex-status"; return (cachedSelf = currentStatus); }
   if (cachedSelf && cachedSource === "account-default") return cachedSelf;
   try {
