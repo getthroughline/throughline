@@ -8,12 +8,14 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
+const SUPPORTED_PROTOCOL_VERSION = "2025-06-18";
+
 // --- staleness guard (mirrors the Claude Code server) ------------------------
 // An already-open session can stay bound to the OLD server process after `codex plugin add`
 // updates the plugin on disk — silently serving outdated persona/memory logic. On whoami we
 // compare the running version to the newest installed and flag if we're the stale one.
 function semverGt(a, b) {
-  const pa = String(a).split("."), pb = String(b).split(".");
+  const pa = String(a).split("+")[0].split("."), pb = String(b).split("+")[0].split(".");
   for (let i = 0; i < 3; i++) { const x = Number(pa[i] ?? 0), y = Number(pb[i] ?? 0); if (x !== y) return x > y; }
   return false;
 }
@@ -319,39 +321,77 @@ async function callTool(name, args) {
 function reply(id, result) {
   process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n");
 }
-function replyError(id, message) {
-  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, error: { code: -32000, message } }) + "\n");
+function replyError(id, message, code = -32603, data) {
+  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, error: { code, message, ...(data === undefined ? {} : { data }) } }) + "\n");
+}
+
+function replyRemote(id, remote) {
+  const payload = remote?.error
+    ? { error: remote.error }
+    : { result: remote?.result ?? {} };
+  process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, ...payload }) + "\n");
+}
+
+let canonicalToolsCache = null;
+async function canonicalTools() {
+  if (canonicalToolsCache) return canonicalToolsCache;
+  const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-list", method: "tools/list", params: {} });
+  if (remote?.error) throw new Error(remote.error.message ?? "remote tools/list failed");
+  const tools = Array.isArray(remote?.result?.tools) ? remote.result.tools : [];
+  if (tools.length) canonicalToolsCache = tools;
+  return tools;
+}
+
+function appTemplateOf(tool) {
+  return tool?._meta?.["openai/outputTemplate"] ?? tool?._meta?.["openai/output_template"] ?? null;
 }
 
 async function handle(msg) {
   const { id, method, params } = msg;
+  // JSON-RPC notifications never receive a response. MCP mutation methods are requests, so an
+  // id-less lookalike is ignored rather than executed without a receipt.
+  if (id === undefined) return;
   if (method === "initialize") {
     return reply(id, {
-      protocolVersion: params?.protocolVersion ?? "2025-06-18",
-      capabilities: { tools: {} },
+      protocolVersion: params?.protocolVersion === SUPPORTED_PROTOCOL_VERSION
+        ? params.protocolVersion
+        : SUPPORTED_PROTOCOL_VERSION,
+      capabilities: { tools: {}, resources: {} },
       serverInfo: { name: "throughline", version: ownVersion() ?? "0.0.0" },
     });
   }
   if (method === "tools/list") {
     let remoteTools = [];
-    try {
-      const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-list", method: "tools/list", params: {} });
-      remoteTools = Array.isArray(remote?.result?.tools) ? remote.result.tools : [];
-    } catch { /* static list keeps the body usable offline */ }
+    try { remoteTools = await canonicalTools(); }
+    catch { /* static list keeps the body usable offline */ }
     const merged = new Map(TOOLS.map((tool) => [tool.name, tool]));
     for (const tool of remoteTools) if (tool?.name) merged.set(tool.name, tool);
     return reply(id, { tools: [...merged.values()] });
   }
   if (method === "tools/call") {
     try {
+      // Apps SDK tools must preserve the canonical result envelope. Re-wrapping only text drops
+      // structuredContent/_meta, so the widget may load but still receive no data.
+      const remoteTool = (await canonicalTools().catch(() => [])).find((tool) => tool?.name === params.name);
+      if (appTemplateOf(remoteTool)) {
+        const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-app-call", method: "tools/call", params });
+        return replyRemote(id, remote);
+      }
       const out = await callTool(params.name, params.arguments ?? {});
       return reply(id, { content: [{ type: "text", text: JSON.stringify(out, null, 2) }] });
     } catch (err) {
       return reply(id, { content: [{ type: "text", text: `error: ${err.message}` }], isError: true });
     }
   }
-  if (method && method.startsWith("notifications/")) return; // notifications get no response
-  if (id !== undefined) return replyError(id, `unknown method: ${method}`);
+  if (method === "resources/list" || method === "resources/read") {
+    try {
+      const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-resource", method, params: params ?? {} });
+      return replyRemote(id, remote);
+    } catch (err) {
+      return replyError(id, err.message, -32603);
+    }
+  }
+  return replyError(id, `unknown method: ${method}`, -32601);
 }
 
 let buffer = "";
