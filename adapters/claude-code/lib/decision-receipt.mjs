@@ -73,6 +73,20 @@ const publicExchange = (row) => ({
   subject: row.subject,
 });
 
+/** Return the newest server-admitted exchange that can still witness this host turn. This is a
+ * read-only projection: MCP recall may carry the identity, but cannot admit, close, or consume it. */
+export function activeDecisionExchange(input, host) {
+  const source = decisionSource(host);
+  const conversationRef = decisionConversationRef(input, host);
+  const row = [...readQueue(input, host)].reverse().find((candidate) => candidate.receipt
+    && !candidate.captured_at && !candidate.closed_at
+    && candidate.source === source && candidate.conversation_ref === conversationRef);
+  return row ? {
+    conversation_ref: row.conversation_ref,
+    capture_ref: row.capture_ref,
+  } : null;
+}
+
 /** Allocate and durably remember a per-exchange identity before asking the cloud to decide.
  * A repeated hook invocation reuses only a recent still-pending identity; once admitted, even an
  * identical prompt receives a new capture_ref and therefore a distinct deed. */

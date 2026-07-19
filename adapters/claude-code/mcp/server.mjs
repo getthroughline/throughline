@@ -3,6 +3,7 @@
 // Exposes the Throughline API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
 import { get, getText, mcpRequest, post, rawDelete, rawGet, rawPost, rebindSelf, self } from "../lib/daemon.mjs";
+import { activeDecisionExchange } from "../lib/decision-receipt.mjs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -251,6 +252,11 @@ async function callTool(name, args) {
       if (args.stream) params.set("stream", args.stream);
       if (args.since) params.set("since", args.since);
       if (args.until) params.set("until", args.until);
+      const exchange = activeDecisionExchange({}, "claude");
+      if (exchange) {
+        params.set("conversation_ref", exchange.conversation_ref);
+        params.set("capture_ref", exchange.capture_ref);
+      }
       return get(`/recall?${params}`);
     }
     case "propose_events":

@@ -2,7 +2,8 @@
 // Minimal MCP stdio server (JSON-RPC 2.0, newline-delimited), no SDK / no deps.
 // Exposes the Throughline API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
-import { get, getText, mcpRequest, post, rawDelete, rawGet, rawPost, rebindSelf, self, withCodexRequest } from "../lib/daemon.mjs";
+import { codexThreadId, get, getText, mcpRequest, post, rawDelete, rawGet, rawPost, rebindSelf, self, withCodexRequest } from "../lib/daemon.mjs";
+import { activeDecisionExchange } from "../lib/decision-receipt.mjs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -226,7 +227,7 @@ const TOOLS = [
   },
 ];
 
-async function callTool(name, args) {
+async function callTool(name, args, request = {}) {
   switch (name) {
     case "whoami": {
       const stale = staleNotice();
@@ -245,6 +246,12 @@ async function callTool(name, args) {
       if (args.stream) params.set("stream", args.stream);
       if (args.since) params.set("since", args.since);
       if (args.until) params.set("until", args.until);
+      const threadId = codexThreadId(request);
+      const exchange = activeDecisionExchange(threadId ? { thread_id: threadId } : {}, "codex");
+      if (exchange) {
+        params.set("conversation_ref", exchange.conversation_ref);
+        params.set("capture_ref", exchange.capture_ref);
+      }
       return get(`/recall?${params}`);
     }
     case "propose_events":
@@ -377,7 +384,7 @@ async function handle(msg) {
         const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-app-call", method: "tools/call", params });
         return replyRemote(id, remote);
       }
-      const out = await callTool(params.name, params.arguments ?? {});
+      const out = await callTool(params.name, params.arguments ?? {}, msg);
       return reply(id, { content: [{ type: "text", text: JSON.stringify(out, null, 2) }] });
     } catch (err) {
       return reply(id, { content: [{ type: "text", text: `error: ${err.message}` }], isError: true });

@@ -4,7 +4,9 @@ import { readFileSync } from "node:fs";
 import { parseActionBundle as parseCodex, parseVisibleTurns as turnsCodex } from "../adapters/codex/lib/action-bundle.mjs";
 import { parseActionBundle as parseClaude, parseVisibleTurns as turnsClaude } from "../adapters/claude-code/lib/action-bundle.mjs";
 import {
+  activeDecisionExchange,
   canonicalDecisionSubject,
+  closeDecisionExchange,
   consumeDecisionExchange,
   decisionConversationRef,
   decisionRequestPath,
@@ -116,6 +118,10 @@ assert.equal(firstPath.searchParams.get("conversation_ref"), firstExchange.conve
 assert.equal(firstPath.searchParams.get("capture_ref"), firstExchange.capture_ref);
 const firstDecision = admittedDecision(firstExchange, "1", "signed-token");
 assert.equal(rememberDecisionReceipt(receiptInput, "codex", "修一下", firstExchange, firstDecision), true);
+assert.deepEqual(activeDecisionExchange(receiptInput, "codex"), {
+  conversation_ref: firstExchange.conversation_ref,
+  capture_ref: firstExchange.capture_ref,
+}, "an admitted, open exchange is visible to same-turn recall");
 let firstMatches = matchDecisionExchanges(receiptInput, "codex", turnsCodex(codexLines, "codex"));
 assert.equal(firstMatches.length, 1);
 assert.deepEqual(firstMatches[0].capture.turns, [
@@ -134,6 +140,8 @@ assert.equal(firstMatches[0].capture.output_event_ref, firstOutputRef);
 assert.equal(matchDecisionExchanges(receiptInput, "codex", turnsCodex(codexLines, "codex"))[0].capture.capture_ref,
   firstExchange.capture_ref, "a failed upload retries the exact same deed");
 assert.equal(consumeDecisionExchange(receiptInput, "codex", firstExchange.capture_ref), true);
+assert.equal(activeDecisionExchange(receiptInput, "codex"), null,
+  "a captured exchange is no longer visible to recall");
 assert.equal(matchDecisionExchanges(receiptInput, "codex", turnsCodex(codexLines, "codex"))[0].capture, null,
   "an acknowledged exchange is retired only after durable capture succeeds");
 
@@ -144,6 +152,21 @@ assert.equal(rememberDecisionReceipt(receiptInput, "codex", "修一下", repeate
   admittedDecision(repeatedExchange, "2", "second-token")), true);
 assert.equal(matchDecisionExchanges(receiptInput, "codex", turnsCodex(codexLines, "codex"))[0].capture.capture_ref,
   repeatedExchange.capture_ref);
+const latestExchange = prepareDecisionExchange(receiptInput, "codex", "再看一下", { nonce: "exchange-three" });
+assert.equal(rememberDecisionReceipt(receiptInput, "codex", "再看一下", latestExchange,
+  admittedDecision(latestExchange, "7", "latest-token")), true);
+assert.equal(activeDecisionExchange(receiptInput, "codex")?.capture_ref, latestExchange.capture_ref,
+  "same-turn recall binds to the newest admitted exchange when more than one remains open");
+
+const closedInput = { session_id: `verify-closed-${process.pid}-${Date.now()}` };
+const closedExchange = prepareDecisionExchange(closedInput, "codex", "关闭", { nonce: "closed" });
+assert.equal(activeDecisionExchange(closedInput, "codex"), null,
+  "a merely prepared exchange is not active before server admission");
+assert.equal(rememberDecisionReceipt(closedInput, "codex", "关闭", closedExchange,
+  admittedDecision(closedExchange, "9", "closed-token")), true);
+assert.equal(closeDecisionExchange(closedInput, "codex", closedExchange.capture_ref, "test"), true);
+assert.equal(activeDecisionExchange(closedInput, "codex"), null,
+  "a closed exchange is no longer visible to recall");
 
 const progressInput = { session_id: `verify-progress-${process.pid}-${Date.now()}` };
 const progressExchange = prepareDecisionExchange(progressInput, "codex", "做个长任务", { nonce: "progress" });

@@ -121,6 +121,50 @@ const runHook = (relativePath, input, extraEnv = {}) => new Promise((resolve, re
   child.stdin.end(JSON.stringify(input));
 });
 
+const runMcpRecall = (relativePath, threadId, extraEnv = {}) => new Promise((resolve, reject) => {
+  const child = spawn(process.execPath, [join(root, relativePath)], {
+    cwd: root,
+    env: {
+      ...process.env,
+      HOME: home,
+      THROUGHLINE_URL: base,
+      THROUGHLINE_API_KEY: "verify-key",
+      THROUGHLINE_SELF: "cocomi",
+      THROUGHLINE_DISABLED: "0",
+      THROUGHLINE_TIMEOUT_MS: "2000",
+      ...extraEnv,
+    },
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+  let stdout = "", stderr = "", settled = false;
+  const finish = (error) => {
+    if (settled) return;
+    settled = true;
+    child.kill();
+    if (error) reject(error);
+    else resolve(JSON.parse(stdout.trim()));
+  };
+  child.stdout.on("data", (chunk) => {
+    stdout += chunk;
+    if (stdout.includes("\n")) finish();
+  });
+  child.stderr.on("data", (chunk) => { stderr += chunk; });
+  child.on("error", finish);
+  child.on("close", (code) => {
+    if (!settled && code !== 0) finish(new Error(`${relativePath} exited ${code}: ${stderr}`));
+  });
+  child.stdin.write(JSON.stringify({
+    jsonrpc: "2.0",
+    id: `recall-${threadId}`,
+    method: "tools/call",
+    params: {
+      name: "recall",
+      arguments: { query: "同轮记忆" },
+      _meta: { threadId },
+    },
+  }) + "\n");
+});
+
 const hostCases = [
   {
     host: "codex",
@@ -129,6 +173,8 @@ const hostCases = [
     load: loadCodexDecision,
     promptHook: "adapters/codex/hooks/user-prompt-submit.mjs",
     stopHook: "adapters/codex/hooks/stop.mjs",
+    mcpServer: "adapters/codex/mcp/server.mjs",
+    mcpEnv(sessionId) { return { CODEX_THREAD_ID: sessionId }; },
     transcript(lines) {
       return lines.map(({ role, content }) => JSON.stringify({
         type: "response_item",
@@ -143,6 +189,8 @@ const hostCases = [
     load: loadClaudeDecision,
     promptHook: "adapters/claude-code/hooks/user-prompt-submit.mjs",
     stopHook: "adapters/claude-code/hooks/stop.mjs",
+    mcpServer: "adapters/claude-code/mcp/server.mjs",
+    mcpEnv(sessionId) { return { CLAUDE_SESSION_ID: sessionId }; },
     transcript(lines) {
       return lines.map(({ role, content }) => JSON.stringify({
         type: role,
@@ -169,6 +217,24 @@ try {
       "the full canonical prompt must reach /decision, not a 500-character prefix");
     assert.equal(decisionRequest.query.get("conversation_ref"), loaded.exchange.conversation_ref);
     assert.equal(decisionRequest.query.get("capture_ref"), loaded.exchange.capture_ref);
+
+    const recallStart = requests.length;
+    const recallResponse = await runMcpRecall(
+      hostCase.mcpServer, directInput.session_id, hostCase.mcpEnv(directInput.session_id),
+    );
+    assert.equal(recallResponse.result?.isError, undefined);
+    const boundRecall = requests.slice(recallStart).find((entry) => entry.path.endsWith("/recall"));
+    assert.ok(boundRecall, `${hostCase.host} MCP recall must reach the self recall endpoint`);
+    assert.equal(boundRecall.query.get("conversation_ref"), loaded.exchange.conversation_ref);
+    assert.equal(boundRecall.query.get("capture_ref"), loaded.exchange.capture_ref);
+
+    const idleSession = `idle-${hostCase.host}-${Date.now()}`;
+    const idleStart = requests.length;
+    await runMcpRecall(hostCase.mcpServer, idleSession, hostCase.mcpEnv(idleSession));
+    const idleRecall = requests.slice(idleStart).find((entry) => entry.path.endsWith("/recall"));
+    assert.ok(idleRecall, `${hostCase.host} idle MCP recall must still work`);
+    assert.equal(idleRecall.query.has("conversation_ref"), false);
+    assert.equal(idleRecall.query.has("capture_ref"), false);
 
     decisionMode = "missing";
     const legacyPrompt = `${hostCase.host}:` + "legacy".repeat(120);
@@ -283,6 +349,11 @@ try {
     decisionMode = "success";
   }
 
+  assert.equal(
+    await import("node:fs").then(({ readFileSync }) => readFileSync(join(root, "adapters/codex/lib/decision-receipt.mjs"), "utf8")),
+    await import("node:fs").then(({ readFileSync }) => readFileSync(join(root, "adapters/claude-code/lib/decision-receipt.mjs"), "utf8")),
+    "Codex and Claude decision receipt witnesses must remain byte-identical",
+  );
   assert.equal(
     await import("node:fs").then(({ readFileSync }) => readFileSync(join(root, "adapters/codex/lib/host-turn-client.mjs"), "utf8")),
     await import("node:fs").then(({ readFileSync }) => readFileSync(join(root, "adapters/claude-code/lib/host-turn-client.mjs"), "utf8")),
