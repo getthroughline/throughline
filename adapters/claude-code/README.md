@@ -30,4 +30,4 @@ relative dates; the session-start clock is a snapshot, not a permanently live pr
 | `THROUGHLINE_SELF` | your account default | pin which self this session uses |
 
 Per-project binding: put a `.throughline` file in a repo root with the self's name on the first
-line (and optionally `mode=work`, or just `off`).
+line. Use `off` instead when that project should not load a self.

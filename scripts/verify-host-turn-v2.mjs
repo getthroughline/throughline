@@ -106,7 +106,7 @@ const runHook = (relativePath, input, extraEnv = {}) => new Promise((resolve, re
       THROUGHLINE_URL: base,
       THROUGHLINE_API_KEY: "verify-key",
       THROUGHLINE_SELF: "cocomi",
-      THROUGHLINE_MODE: "full",
+      THROUGHLINE_DISABLED: "0",
       THROUGHLINE_TIMEOUT_MS: "2000",
       ...extraEnv,
     },

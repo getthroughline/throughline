@@ -10,10 +10,12 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { loadHostTurnDecision } from "../lib/host-turn-client.mjs";
+import { sessionDisabled } from "../lib/daemon.mjs";
 
 let hookInput = {};
 try { hookInput = JSON.parse(readFileSync(0, "utf8") || "{}"); } catch {}
 const currentPrompt = String(hookInput.prompt ?? hookInput.user_prompt ?? hookInput.message?.content ?? "").trim();
+if (sessionDisabled()) process.exit(0);
 
 const emit = (additionalContext, systemMessage = "") => {
   const output = { hookSpecificOutput: { hookEventName: "UserPromptSubmit", additionalContext } };
@@ -76,16 +78,13 @@ try {
   const clockLine = clk
     ? `\n🕐 It is NOW ${clk}${status.homePlace ? ` in your home (${status.homePlace})` : ""} — computed fresh this turn. This is the current time; trust it over any clock elsewhere in your context, which was frozen at session start.`
     : "";
-  // the voice lines, from the freshest mode snapshot that has them
+  // the voice lines, from the self's structured snapshot
   let lines = "";
-  for (const mode of ["full", "companion", "work"]) {
-    try {
-      const snap = JSON.parse(readFileSync(join(homedir(), ".throughline", "cache",
-        `${String(selfName).replace(/[^\w.-]/g, "_")}.${mode}.json`), "utf8"));
-      const m = String(snap?.context ?? "").match(/## Voice anchor[^\n]*\n([\s\S]*?)(?=\n## |$)/);
-      if (m?.[1]?.trim()) { lines = m[1].trim().split("\n").slice(0, 3).join("\n"); break; }
-    } catch { /* try the next mode */ }
-  }
+  try {
+    const snap = JSON.parse(readFileSync(join(homedir(), ".throughline", "cache",
+      `${String(selfName).replace(/[^\w.-]/g, "_")}.json`), "utf8"));
+    lines = String(snap?.voiceAnchor ?? "").trim().split("\n").slice(0, 3).join("\n");
+  } catch { /* the self still stands without an expression sample */ }
   let freshMemory = "";
   if (currentPrompt.length >= 2) {
     // Same deterministic act, posture and memory gate as every other body; Claude only realizes it.

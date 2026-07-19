@@ -4,7 +4,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { hasKey, isProtocolUpgradeError, rawPost, safe, self, sessionMode } from "../lib/daemon.mjs";
+import { hasKey, isProtocolUpgradeError, rawPost, safe, self, sessionDisabled } from "../lib/daemon.mjs";
 import { parseActionBundle, parseVisibleTurns } from "../lib/action-bundle.mjs";
 import { consumeDecisionExchange, matchDecisionExchanges, rememberDecisionOutput } from "../lib/decision-receipt.mjs";
 
@@ -14,7 +14,7 @@ const upgradeNotice = (error) =>
   `Throughline plugin upgrade required: shared-self capture was rejected (${String(error?.code || error?.message || "HTTP 426")}). `
   + "Update Throughline and start a new session; the rejected exchange was not written to shared history.";
 try {
-  if ((!hasKey() && !process.env.THROUGHLINE_URL) || sessionMode("full") === "off") done();
+  if ((!hasKey() && !process.env.THROUGHLINE_URL) || sessionDisabled()) done();
   const input = JSON.parse(readFileSync(0, "utf8") || "{}");
   if (input.stop_hook_active || !input.transcript_path || !existsSync(input.transcript_path)) done();
   const lines = readFileSync(input.transcript_path, "utf8").trim().split("\n");

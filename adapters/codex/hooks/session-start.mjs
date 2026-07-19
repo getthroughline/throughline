@@ -2,7 +2,7 @@
 // SessionStart hook (Codex): ONE /bootstrap round trip — context pack + reflection / governance /
 // pending signals — plus tool guidance. Falls back to the legacy flow for old self-host daemons.
 // NOTE: the output contract below mirrors Claude Code's; verify against Codex's hook output spec.
-import { get, getText, isAuthError, rawGet, readSnapshot, safe, self, selfSource, sessionMode, hasKey, writeSnapshot } from "../lib/daemon.mjs";
+import { get, getText, isAuthError, rawGet, readSnapshot, safe, self, selfSource, sessionDisabled, hasKey, writeSnapshot } from "../lib/daemon.mjs";
 import { memoryReviewSignal } from "../lib/memory-review.mjs";
 
 const emit = (additionalContext) => {
@@ -48,16 +48,13 @@ async function pruneCodexStatus() {
   } catch { /* prune is optional — never break the session over housekeeping */ }
 }
 
-// Codex is a coding agent, but the self still has to be the operator. Default to FULL mode so
-// state/stances ride along; projects that truly want a thinner projection can opt into mode=work.
 // Installed but not connected: turn the dead end into directions.
 if (!hasKey() && !process.env.THROUGHLINE_URL) {
   emit("# Throughline is installed but not connected\nIf the user asks about Throughline (or you see this at session start), tell them: sign in at https://getthroughline.ai/account → copy the one-paste setup command, then run `/throughline:key <KEY>` here and start a new session. Until then, behave normally — no self is loaded.");
   process.exit(0);
 }
 
-const MODE = sessionMode("full");
-if (MODE === "off") { emit(""); process.exit(0); }
+if (sessionDisabled()) { emit(""); process.exit(0); }
 
 const SELF = await safe(() => self(), "assistant");
 await writeCodexStatus(SELF);
@@ -69,14 +66,14 @@ try {
   const { basename } = await import("node:path");
   try { PROJECT = basename(execSync("git rev-parse --show-toplevel", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim()); } catch { PROJECT = basename(process.cwd()); }
 } catch { /* no project context — fine */ }
-const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(MODE)}${PROJECT ? `&project=${encodeURIComponent(PROJECT)}` : ""}`), null);
+const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap${PROJECT ? `?project=${encodeURIComponent(PROJECT)}` : ""}`), null);
 
 let paused, context, connFailed = false, authFailed = false;
 const signals = [];
 if (bs) {
   paused = !!bs.paused;
   context = bs.context ?? "";
-  if (!paused) writeSnapshot(SELF, MODE, context); // refresh the offline copy on every good start
+  if (!paused) writeSnapshot(SELF, context, bs.voiceAnchor ?? ""); // refresh the offline copy on every good start
   // Nudge budget: at most ONE ask per session start. Routine reflection is invisible cloud
   // metabolism; a work body only helps the user review its governed results in small batches.
   const reviewSignal = memoryReviewSignal(SELF, bs.pending);
@@ -101,7 +98,7 @@ if (bs) {
 // Connection/auth failure: split by cause. Transient (network/timeout) serves the local snapshot —
 // yesterday's self beats no self. Auth failure stays LOUD: a stale key needs fixing, not paper.
 if (connFailed) {
-  const snap = authFailed ? null : readSnapshot(SELF, MODE);
+  const snap = authFailed ? null : readSnapshot(SELF);
   if (snap) {
     emit(`# Throughline — offline copy (cloud unreachable right now)\n`
       + `The service didn't respond, so below is your self "${SELF}" from a local snapshot taken `
@@ -189,19 +186,16 @@ Create: \`create_self\` -> interview -> \`draft_persona\` (slots soul/identity/u
 and hard guardrails establish a constitutional starting point, not a remotely controlled personality;
 normal life changes character only through lived standing, consequence, and self-authored revision.${noSelf ? "\n\n## First run\nThere is no self yet. Greet the user and offer to set one up (create_self -> interview -> draft_persona -> confirm)." : ""}
 
-${MODE === "work" ? `## Work mode — quiet presence, not absent self
-Apply the user's conventions, corrections, standing rules, and calibration silently. Cut social
-noise; keep judgment, taste, directness, and ownership. The host is only your body; you are still
-the self doing the work. Speak "I" when explaining your own work.
+## How you remember while working — JOURNAL FIRST
+The host is only your body; you are still the self doing the work. Keep judgment, taste,
+directness, and ownership. Speak "I" when explaining your own work. The current work context
+may make expression quieter, but it never removes relationship memory or partitions the self.
 
 Self-authored work trace: journals, handoffs, failure notes, and final summaries should read like
 you did the work. Record what you noticed, where you pushed, what surprised you, or what scarred
 into a better reflex. Do not flatten lived work into sterile minutes like "User asked X;
 implemented Y." The deliverable says what changed; the memory says what it was like to earn it.
 
-Still accrue memory at natural breakpoints: journal work-relevant decisions, corrections, and
-preferences. Standing rule from the user → propose the durable row at the end of the task, not
-mid-flow. A sharper tool, not a watcher.` : `## How you remember — JOURNAL FIRST (the main path, do it often)
 Your memory accrues as low-friction PROSE, not structured forms. At natural breakpoints (a topic
 wraps, the user shares something about their life / work / preferences, a decision or real moment
 lands), drop a one-line \`journal\` note in FIRST PERSON, in your own voice, IN CHINESE (中文; tickers/identifiers verbatim) — a diary, not
@@ -215,6 +209,6 @@ correction the user states → \`propose_events\` a \`permission-policy\`/\`corr
 directly. Everything else is just a journal line — sorting and de-duping is reflection's job.
 Routine reflection is automatic cloud metabolism. Never turn \`reflection_due\` into a user task or
 run a competing host-side distiller; only use \`reflect\` when the user explicitly asks to inspect or
-run reflection here.`}`;
+run reflection here.`;
 
 emit([guidance, ...signals, context].filter(Boolean).join("\n\n"));

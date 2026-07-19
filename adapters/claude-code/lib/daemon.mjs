@@ -67,8 +67,8 @@ function projectSelfUnsafe() {
     // must be a FILE: ~/.throughline (the data directory) shares the name — skip dirs, keep walking
     if (existsSync(f) && statSync(f).isFile()) {
       const first = readFileSync(f, "utf8").trim().split("\n")[0].trim();
-      if (first && first.toLowerCase() !== "off" && !first.toLowerCase().startsWith("mode=")) return first;
-      return null; // "off" or mode-only file: no self override here
+      if (first && first.toLowerCase() !== "off" && !first.includes("=")) return first;
+      return null; // "off" disables this project; key/value lines are not self names
     }
     const parent = dirname(dir);
     if (parent === dir) break;
@@ -108,11 +108,6 @@ function pluginRuntime() {
 export function hasKey() { return !!apiKey(); }
 export function selfSource() { return cachedSource ?? "default"; }
 
-// Mode = persona thickness for this session: "full" | "companion" | "work" | "off".
-// Resolution: THROUGHLINE_MODE env > `mode=` line in .throughline > adapter default.
-// "off" (also as the .throughline first line) disables injection entirely in this project —
-// a vanilla agent, no persona, no capture guidance. Presence is a dial, not a default.
-let cachedMode;
 function projectFileLines() {
   try { return projectFileLinesUnsafe(); } catch { return null; }
 }
@@ -127,16 +122,10 @@ function projectFileLinesUnsafe() {
   }
   return null;
 }
-export function sessionMode(defaultMode = "full") {
-  if (cachedMode) return cachedMode;
-  if (process.env.THROUGHLINE_MODE) return (cachedMode = process.env.THROUGHLINE_MODE);
+export function sessionDisabled() {
+  if (/^(1|true|yes)$/i.test(String(process.env.THROUGHLINE_DISABLED ?? ""))) return true;
   const lines = projectFileLines();
-  if (lines) {
-    if (lines[0]?.toLowerCase() === "off") return (cachedMode = "off");
-    const m = lines.find((l) => l.toLowerCase().startsWith("mode="));
-    if (m) return (cachedMode = m.slice(5).trim().toLowerCase());
-  }
-  return (cachedMode = defaultMode);
+  return lines?.[0]?.toLowerCase() === "off";
 }
 
 export async function self() {
@@ -265,17 +254,17 @@ export async function safe(fn, fallback) {
 // the user to fix it — papering over it would hide the one signal that gets it fixed.
 import { mkdirSync, writeFileSync } from "node:fs";
 const SNAP_DIR = join(homedir(), ".throughline", "cache");
-const snapPath = (selfName, mode) => join(SNAP_DIR, `${String(selfName).replace(/[^\w.-]/g, "_")}.${mode}.json`);
-export function writeSnapshot(selfName, mode, context) {
+const snapPath = (selfName) => join(SNAP_DIR, `${String(selfName).replace(/[^\w.-]/g, "_")}.json`);
+export function writeSnapshot(selfName, context, voiceAnchor = "") {
   try {
     if (!context || context.trim().length < 60) return; // an empty self is not worth serving stale
     mkdirSync(SNAP_DIR, { recursive: true });
-    writeFileSync(snapPath(selfName, mode), JSON.stringify({ ts: new Date().toISOString(), self: selfName, mode, context }), { mode: 0o600 });
+    writeFileSync(snapPath(selfName), JSON.stringify({ ts: new Date().toISOString(), self: selfName, context, voiceAnchor }), { mode: 0o600 });
   } catch { /* best-effort: a failed snapshot must never affect the live session */ }
 }
-export function readSnapshot(selfName, mode, maxAgeDays = 14) {
+export function readSnapshot(selfName, maxAgeDays = 14) {
   try {
-    const s = JSON.parse(readFileSync(snapPath(selfName, mode), "utf8"));
+    const s = JSON.parse(readFileSync(snapPath(selfName), "utf8"));
     if (!s?.context) return null;
     const ageDays = (Date.now() - Date.parse(s.ts)) / 86_400_000;
     return Number.isFinite(ageDays) && ageDays <= maxAgeDays ? s : null; // a 2-week-old self is a different self — fail loud instead

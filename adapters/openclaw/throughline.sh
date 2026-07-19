@@ -29,7 +29,7 @@ self() {
 
 case "${1:-help}" in
   bootstrap)   # one round trip: context + reflection/pending signals. Run at session start; ADOPT the output.
-    curl -sf "$BASE/selves/$(self)/bootstrap?mode=${2:-full}" "${auth[@]}" ;;
+    curl -sf "$BASE/selves/$(self)/bootstrap" "${auth[@]}" ;;
   journal)     # journal "a one-line diary note" — the main capture path, cheap and frequent
     shift; curl -sf -X POST "$BASE/selves/$(self)/journal" "${auth[@]}" -d "{\"content\": $(printf '%s' "$*" | python3 -c 'import json,sys;print(json.dumps(sys.stdin.read()))')}" ;;
   recall)      # recall "query" [k] [stream] — search memory; empty query + stream = last k rows of that stream

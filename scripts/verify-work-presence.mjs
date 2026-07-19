@@ -37,10 +37,15 @@ function requireAbsent(key, text, why) {
   if (body[key].includes(text)) failures.push(`${files[key]}: still contains ${why}`);
 }
 
+function requireAbsentMatch(key, pattern, why) {
+  if (pattern.test(body[key])) failures.push(`${files[key]}: still contains ${why}`);
+}
+
 for (const key of ["codexPrompt", "claudePrompt"]) {
   requireIncludes(key, "This host is only the body", "host-as-body anchor");
   requireIncludes(key, 'Speak "I", not about the host', "first-person anchor");
-  requireIncludes(key, 'for (const mode of ["full", "companion", "work"])', "full-first voice snapshot order");
+  requireIncludes(key, "voiceAnchor", "structured voice anchor snapshot");
+  requireAbsent(key, "companion", "persona mode branch");
   requireIncludes(key, "Choose the self's move before wording it", "pre-language self decision");
   requireIncludes(key, "independent practical posture", "act/posture separation");
   requireIncludes(key, "A response is not agreement", "non-sycophancy posture boundary");
@@ -98,6 +103,9 @@ for (const key of ["codexDaemon", "claudeDaemon"]) {
   requireIncludes(key, '"x-throughline-source": SOURCE', "source provenance header");
   requireIncludes(key, "ThroughlineHttpError", "structured HTTP error");
   requireIncludes(key, "host_turn_protocol_v2_required", "upgrade error classification");
+  requireIncludes(key, "sessionDisabled", "single explicit disable path");
+  requireAbsent(key, "sessionMode", "deleted personality mode resolver");
+  requireAbsentMatch(key, /\bTHROUGHLINE_MODE\b/u, "deleted personality mode environment variable");
 }
 
 if (body.codexReceipt !== body.claudeReceipt)
@@ -108,7 +116,7 @@ for (const key of ["codexHooks", "claudeHooks"])
   requireIncludes(key, '"Stop"', "raw close hook registration");
 
 for (const key of ["codexSession", "claudeSession"]) {
-  requireIncludes(key, "## Work mode — quiet presence, not absent self", "work-mode header");
+  requireIncludes(key, "## How you remember while working — JOURNAL FIRST", "continuous-self work memory contract");
   requireIncludes(key, "The host is only your body", "host-as-body work contract");
   requireIncludes(key, 'Speak "I" when explaining your own work', "first-person work contract");
   requireIncludes(key, "Do not flatten lived work into sterile minutes", "lived trace guard");
@@ -121,6 +129,8 @@ for (const key of ["codexSession", "claudeSession"]) {
   requireAbsent(key, "Staged memories awaiting", "user-facing queue language");
   requireAbsent(key, "Reflection queued", "user-facing reflection maintenance");
   requireIncludes(key, "Routine reflection is automatic cloud metabolism", "invisible reflection ownership");
+  requireAbsent(key, "MODE ===", "deleted personality mode branch");
+  requireAbsent(key, "Work mode", "deleted personality mode copy");
 }
 
 for (const key of Object.keys(files)) {
@@ -138,7 +148,7 @@ for (const key of Object.keys(files)) {
 
 for (const text of [
   "The host is only the body",
-  "Work mode is quiet presence, not absent self",
+  "Work is quiet presence, not absent self",
   "The self explains its own work in first person",
   "Do not fabricate experiences for presence",
   "The self chooses the move before the host writes the sentence",

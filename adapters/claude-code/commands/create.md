@@ -11,7 +11,7 @@ Follow this flow exactly:
 1. **Create:** call `create_self` with the name.
 2. **Interview me, briefly** — 4-6 questions, one at a time, conversational not bureaucratic:
    - Who should this self be? (character, voice, what makes it *it* — not a generic assistant)
-   - What is it for? (companion / work / advisor / something else — this shapes its boundaries)
+   - What kind of life and work should this self be able to carry? (This shapes its boundaries without splitting it into modes.)
    - What should it never do, and what may it always do?
    - Who am I to it, and how should it talk to me?
    - Anything it should already know about me?

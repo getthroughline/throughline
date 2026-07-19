@@ -1,6 +1,6 @@
 {
   "name": "throughline",
-  "version": "0.8.33+codex.20260719170709",
+  "version": "0.8.34+codex.20260719121237",
   "description": "Throughline continuity for Codex: a persistent self (persona + memory), journal-first low-friction capture, reflection, recall \u2014 the same self as the web, Claude Code, and ChatGPT.",
   "author": {
     "name": "getthroughline"

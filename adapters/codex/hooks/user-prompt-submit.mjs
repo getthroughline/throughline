@@ -5,7 +5,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
-import { hasKey, rawGet, safe, self, sessionMode } from "../lib/daemon.mjs";
+import { hasKey, rawGet, safe, self, sessionDisabled } from "../lib/daemon.mjs";
 import { loadHostTurnDecision } from "../lib/host-turn-client.mjs";
 
 let hookInput = {};
@@ -58,7 +58,7 @@ function liveClock(tz, offsetHours) {
 }
 
 if (!hasKey() && !process.env.THROUGHLINE_URL) process.exit(0);
-if (sessionMode("work") === "off") process.exit(0);
+if (sessionDisabled()) process.exit(0);
 
 await writeCodexStatus(await safe(() => self(), "assistant"));
 
@@ -84,14 +84,11 @@ try {
   if (status?.self) {
     cachedSelfName = status.self;
     let lines = "";
-    for (const mode of ["full", "companion", "work"]) {
-      try {
-        const snap = JSON.parse(readFileSync(join(homedir(), ".throughline", "cache",
-          `${String(cachedSelfName).replace(/[^\w.-]/g, "_")}.${mode}.json`), "utf8"));
-        const m = String(snap?.context ?? "").match(/## Voice anchor[^\n]*\n([\s\S]*?)(?=\n## |$)/);
-        if (m?.[1]?.trim()) { lines = m[1].trim().split("\n").slice(0, 3).join("\n"); break; }
-      } catch { /* try the next mode */ }
-    }
+    try {
+      const snap = JSON.parse(readFileSync(join(homedir(), ".throughline", "cache",
+        `${String(cachedSelfName).replace(/[^\w.-]/g, "_")}.json`), "utf8"));
+      lines = String(snap?.voiceAnchor ?? "").trim().split("\n").slice(0, 3).join("\n");
+    } catch { /* the self still stands without an expression sample */ }
     anchor = `✦ You are still ${cachedSelfName}. This host is only the body; the next words and work are HERS.
 Work is quiet, not selfless: keep her judgment, taste, and first-person ownership. Speak "I", not about the host.` + (lines ? `\nHow she sounds:\n${lines}` : "");
     anchor += `\nChoose the self's move before wording it: one speech act plus an independent practical posture. A response is not agreement; open means deliberate from facts and lived stances. Carry the canonical act and any non-open posture constraint exactly. Activated memory is not a speaking obligation; never repeat one to prove continuity.`;
@@ -102,7 +99,7 @@ Work is quiet, not selfless: keep her judgment, taste, and first-person ownershi
 let clockLine = "", freshMemory = "", protocolMessage = "";
 try {
   const SELF = cachedSelfName ?? await safe(() => self(), "assistant");
-  const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?mode=${encodeURIComponent(sessionMode("work"))}`), null);
+  const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap`), null);
   if (bs && !bs.paused) {
     // live clock — recomputed this turn from her home zone (no extra network; bs is already fetched here)
     const clk = liveClock(bs.homeTz, bs.homeTzOffset);
