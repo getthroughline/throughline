@@ -18,7 +18,9 @@ relative dates; the session-start clock is a snapshot, not a permanently live pr
   for this session (in one round trip) and injects its context plus a short instruction for when
   to use the tools. Honors pause; respects per-project binding.
 - **MCP server** ([`mcp/server.mjs`](mcp/server.mjs)) — exposes the Throughline tools
-  (`whoami`, `recall`, `journal`, `propose_events`, `reflect`, …) to the host model.
+  (`whoami`, `recall`, `journal`, `propose_events`, `reflect`, …) to the host model. Consequential
+  Throughline hands carry the exact open host-turn identity, while the cloud rereads the signed posture and holds
+  stale or unbound movement.
 - **Slash commands** ([`commands/`](commands)) — `/throughline:create`, `:switch`, `:journal`,
   `:reflect`, and more.
 

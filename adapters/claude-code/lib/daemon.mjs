@@ -210,12 +210,22 @@ export async function post(sub, body) {
 /** Forward one MCP message to the canonical cloud tool surface while preserving this body's
  * provenance and the session's exact self binding. Local adapters keep a few ergonomic tools,
  * but capability-bearing tools must not drift into a second hand-written implementation. */
-export async function mcpRequest(message) {
+export function hostTurnHeaders(exchange) {
+  const conversation = String(exchange?.conversation_ref ?? "").trim().slice(0, 160);
+  const capture = String(exchange?.capture_ref ?? "").trim().slice(0, 180);
+  return conversation && capture ? {
+    "x-throughline-conversation": conversation,
+    "x-throughline-capture": capture,
+  } : {};
+}
+
+export async function mcpRequest(message, exchange = null) {
   const res = await fetchWithTimeout(`${BASE}/mcp`, {
     method: "POST",
     headers: authHeaders({
       "content-type": "application/json",
       "x-throughline-self": await self(),
+      ...hostTurnHeaders(exchange),
     }),
     body: JSON.stringify(message ?? {}),
   });

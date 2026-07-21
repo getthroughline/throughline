@@ -29,11 +29,15 @@ const cloud = createServer(async (req, res) => {
   for await (const chunk of req) chunks.push(chunk);
   const msg = JSON.parse(Buffer.concat(chunks).toString("utf8"));
   if (msg.method === "tools/list") return res.end(JSON.stringify(result(msg.id, { tools: [remoteTool] })));
-  if (msg.method === "tools/call" && msg.params?.name === "recall") return res.end(JSON.stringify(result(msg.id, {
-    content: [{ type: "text", text: JSON.stringify({ events: [{ id: "evt_1" }] }) }],
-    structuredContent: { query: msg.params.arguments?.query, events: [{ stream: "journal", summary: "remembered", ts: "2026-07-19", grounded: true }] },
-    _meta: { "openai/outputTemplate": widgetUri },
-  })));
+  if (msg.method === "tools/call" && msg.params?.name === "recall") {
+    if (String(msg.params.arguments?.query).startsWith("parallel-"))
+      await new Promise((done) => setTimeout(done, 180));
+    return res.end(JSON.stringify(result(msg.id, {
+      content: [{ type: "text", text: JSON.stringify({ events: [{ id: "evt_1" }] }) }],
+      structuredContent: { query: msg.params.arguments?.query, events: [{ stream: "journal", summary: "remembered", ts: "2026-07-19", grounded: true }] },
+      _meta: { "openai/outputTemplate": widgetUri },
+    })));
+  }
   if (msg.method === "resources/list") return res.end(JSON.stringify(result(msg.id, { resources: [{ uri: widgetUri, name: "memories.html", mimeType: "text/html+skybridge" }] })));
   if (msg.method === "resources/read") {
     if (typeof msg.params?.uri !== "string" || !msg.params.uri) return res.end(JSON.stringify(error(msg.id, -32602, "resources/read requires a non-empty uri")));
@@ -79,6 +83,14 @@ try {
   assert.equal(called.result._meta["openai/outputTemplate"], widgetUri);
   assert.equal(called.result.structuredContent.query, "Tokyo");
   assert.equal(called.result.structuredContent.events[0].summary, "remembered");
+  const parallelAt = Date.now();
+  const [parallelA, parallelB] = await Promise.all([
+    request("tools/call", { name: "recall", arguments: { query: "parallel-a" } }),
+    request("tools/call", { name: "recall", arguments: { query: "parallel-b" } }),
+  ]);
+  assert.equal(parallelA.result.structuredContent.query, "parallel-a");
+  assert.equal(parallelB.result.structuredContent.query, "parallel-b");
+  assert.ok(Date.now() - parallelAt < 320, "read-only MCP calls should not wait in a global FIFO");
   assert.equal((await request("resources/list")).result.resources[0].uri, widgetUri);
   assert.equal((await request("resources/read", { uri: widgetUri })).result.contents[0].text, widgetHtml);
   assert.equal((await request("resources/read", {})).error.code, -32602);

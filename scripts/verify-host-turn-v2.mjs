@@ -28,7 +28,15 @@ const server = createServer(async (request, response) => {
   for await (const chunk of request) raw += chunk;
   const url = new URL(request.url, "http://127.0.0.1");
   const source = String(request.headers["x-throughline-source"] ?? "");
-  const record = { method: request.method, path: url.pathname, query: url.searchParams, source, raw };
+  const record = {
+    method: request.method,
+    path: url.pathname,
+    query: url.searchParams,
+    source,
+    conversation: String(request.headers["x-throughline-conversation"] ?? ""),
+    capture: String(request.headers["x-throughline-capture"] ?? ""),
+    raw,
+  };
   requests.push(record);
 
   if (url.pathname.endsWith("/bootstrap")) return send(response, 200, {
@@ -83,6 +91,13 @@ const server = createServer(async (request, response) => {
     });
   }
   if (url.pathname.endsWith("/capture/ingest")) return send(response, 200, { saved: 1, staged: 0 });
+  if (url.pathname === "/mcp") {
+    const message = JSON.parse(raw || "{}");
+    return send(response, 200, {
+      jsonrpc: "2.0", id: message.id,
+      result: { content: [{ type: "text", text: JSON.stringify({ ok: true }) }] },
+    });
+  }
   return send(response, 404, { error: "not found" });
 });
 
@@ -121,7 +136,7 @@ const runHook = (relativePath, input, extraEnv = {}) => new Promise((resolve, re
   child.stdin.end(JSON.stringify(input));
 });
 
-const runMcpRecall = (relativePath, threadId, extraEnv = {}) => new Promise((resolve, reject) => {
+const runMcpTool = (relativePath, threadId, name, args = {}, extraEnv = {}) => new Promise((resolve, reject) => {
   const child = spawn(process.execPath, [join(root, relativePath)], {
     cwd: root,
     env: {
@@ -155,11 +170,11 @@ const runMcpRecall = (relativePath, threadId, extraEnv = {}) => new Promise((res
   });
   child.stdin.write(JSON.stringify({
     jsonrpc: "2.0",
-    id: `recall-${threadId}`,
+    id: `${name}-${threadId}`,
     method: "tools/call",
     params: {
-      name: "recall",
-      arguments: { query: "同轮记忆" },
+      name,
+      arguments: args,
       _meta: { threadId },
     },
   }) + "\n");
@@ -219,8 +234,9 @@ try {
     assert.equal(decisionRequest.query.get("capture_ref"), loaded.exchange.capture_ref);
 
     const recallStart = requests.length;
-    const recallResponse = await runMcpRecall(
-      hostCase.mcpServer, directInput.session_id, hostCase.mcpEnv(directInput.session_id),
+    const recallResponse = await runMcpTool(
+      hostCase.mcpServer, directInput.session_id, "recall", { query: "同轮记忆" },
+      hostCase.mcpEnv(directInput.session_id),
     );
     assert.equal(recallResponse.result?.isError, undefined);
     const boundRecall = requests.slice(recallStart).find((entry) => entry.path.endsWith("/recall"));
@@ -228,9 +244,25 @@ try {
     assert.equal(boundRecall.query.get("conversation_ref"), loaded.exchange.conversation_ref);
     assert.equal(boundRecall.query.get("capture_ref"), loaded.exchange.capture_ref);
 
+    const handStart = requests.length;
+    const handResponse = await runMcpTool(
+      hostCase.mcpServer, directInput.session_id, "create_self", { name: "test-self" },
+      hostCase.mcpEnv(directInput.session_id),
+    );
+    assert.equal(handResponse.result?.isError, undefined);
+    const boundHand = requests.slice(handStart).filter((entry) => entry.path === "/mcp").find((entry) => {
+      try { return JSON.parse(entry.raw || "{}").method === "tools/call"; } catch { return false; }
+    });
+    assert.ok(boundHand, `${hostCase.host} consequential MCP hand must use the canonical cloud surface`);
+    assert.equal(boundHand.conversation, loaded.exchange.conversation_ref);
+    assert.equal(boundHand.capture, loaded.exchange.capture_ref);
+
     const idleSession = `idle-${hostCase.host}-${Date.now()}`;
     const idleStart = requests.length;
-    await runMcpRecall(hostCase.mcpServer, idleSession, hostCase.mcpEnv(idleSession));
+    await runMcpTool(
+      hostCase.mcpServer, idleSession, "recall", { query: "同轮记忆" },
+      hostCase.mcpEnv(idleSession),
+    );
     const idleRecall = requests.slice(idleStart).find((entry) => entry.path.endsWith("/recall"));
     assert.ok(idleRecall, `${hostCase.host} idle MCP recall must still work`);
     assert.equal(idleRecall.query.has("conversation_ref"), false);

@@ -228,6 +228,16 @@ const TOOLS = [
 ];
 
 async function callTool(name, args, request = {}) {
+  const remoteCall = async () => {
+    const threadId = codexThreadId(request);
+    const exchange = activeDecisionExchange(threadId ? { thread_id: threadId } : {}, "codex");
+    const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-call", method: "tools/call", params: { name, arguments: args ?? {} } }, exchange);
+    if (remote?.error) throw new Error(remote.error.message ?? `remote tool failed: ${name}`);
+    const content = remote?.result?.content ?? [];
+    const item = content.find((x) => x?.type === "text");
+    if (!item) return remote?.result ?? {};
+    try { return JSON.parse(item.text); } catch { return { text: item.text, isError: !!remote?.result?.isError }; }
+  };
   switch (name) {
     case "whoami": {
       const stale = staleNotice();
@@ -272,30 +282,18 @@ async function callTool(name, args, request = {}) {
       return get("/reflect");
     case "complete_reflection":
       return post("/reflect/complete", { cursor: args.cursor });
-    case "confirm_events": {
-      const confirmed = [], notFound = [];
-      for (const id of args.ids ?? []) {
-        try { confirmed.push((await post("/capture/confirm", { id })).confirmed.id); }
-        catch { notFound.push(id); }
-      }
-      return { confirmed, notFound };
-    }
-    case "reject_events": {
-      const rejected = [];
-      for (const id of args.ids ?? []) {
-        const r = await post("/capture/reject", { id }).catch(() => ({ rejected: false }));
-        if (r.rejected) rejected.push(id);
-      }
-      return { rejected };
-    }
+    case "confirm_events":
+    case "reject_events":
+      return remoteCall();
     case "list_selves": {
       const [selves, cfg] = await Promise.all([rawGet("/selves"), rawGet("/config")]);
       return { selves: selves.selves, default: cfg.default_self ?? null, paused: !!cfg.paused };
     }
     case "create_self":
-      return rawPost(`/selves/${encodeURIComponent(args.name)}`, {});
+      return remoteCall();
     case "use_self": {
-      const r = await rawPost("/config", { default_self: args.name });
+      const r = await remoteCall();
+      if (r?.blocked || r?.error) return r;
       // re-point THIS session too — otherwise every later write lands on the old self
       const rebound = rebindSelf(args.name);
       return rebound ? r : { ...r, notice: `account default switched, but this session is pinned to "${await self()}" (env/.throughline) — the pin still applies here` };
@@ -308,20 +306,14 @@ async function callTool(name, args, request = {}) {
       return r;
     }
     case "delete_self": {
-      const r = await rawDelete(`/selves/${encodeURIComponent(args.name)}`);
-      if (args.name === (await self())) rebindSelf(null); // re-resolve from account default next call
+      const r = await remoteCall();
+      if (!r?.blocked && !r?.error && args.name === (await self())) rebindSelf(null); // re-resolve from account default next call
       return r;
     }
     case "draft_persona":
-      return post("/capture/draft-persona", { docs: args.docs ?? [] });
-    default: {
-      const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-call", method: "tools/call", params: { name, arguments: args ?? {} } });
-      if (remote?.error) throw new Error(remote.error.message ?? `remote tool failed: ${name}`);
-      const content = remote?.result?.content ?? [];
-      const item = content.find((x) => x?.type === "text");
-      if (!item) return remote?.result ?? {};
-      try { return JSON.parse(item.text); } catch { return { text: item.text, isError: !!remote?.result?.isError }; }
-    }
+      return remoteCall();
+    default:
+      return remoteCall();
   }
 }
 
@@ -381,7 +373,9 @@ async function handle(msg) {
       // structuredContent/_meta, so the widget may load but still receive no data.
       const remoteTool = (await canonicalTools().catch(() => [])).find((tool) => tool?.name === params.name);
       if (appTemplateOf(remoteTool)) {
-        const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-app-call", method: "tools/call", params });
+        const threadId = codexThreadId(msg);
+        const exchange = activeDecisionExchange(threadId ? { thread_id: threadId } : {}, "codex");
+        const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-app-call", method: "tools/call", params }, exchange);
         return replyRemote(id, remote);
       }
       const out = await callTool(params.name, params.arguments ?? {}, msg);
@@ -402,7 +396,27 @@ async function handle(msg) {
 }
 
 let buffer = "";
-let queue = Promise.resolve(); // process requests in arrival order (avoid mutate/read races)
+// Reads may arrive together (Codex commonly asks whoami + recall in parallel). A single FIFO made
+// the second read spend most of its timeout waiting behind the first. Reads now share the latest
+// mutation barrier; a mutation waits for every earlier read and remains strictly ordered.
+const READ_ONLY_TOOLS = new Set(["whoami", "recall", "pending", "coverage", "reflect", "list_selves"]);
+const readOnlyRequest = (msg) =>
+  ["initialize", "tools/list", "resources/list", "resources/read"].includes(msg?.method)
+  || (msg?.method === "tools/call" && READ_ONLY_TOOLS.has(msg?.params?.name));
+let mutationBarrier = Promise.resolve();
+const activeReads = new Set();
+const runMessage = (msg) => withCodexRequest(msg, () => handle(msg)).catch(() => {});
+function schedule(msg) {
+  if (readOnlyRequest(msg)) {
+    const task = mutationBarrier.then(() => runMessage(msg));
+    activeReads.add(task);
+    task.finally(() => activeReads.delete(task));
+    return;
+  }
+  const before = mutationBarrier;
+  const reads = [...activeReads];
+  mutationBarrier = Promise.allSettled([before, ...reads]).then(() => runMessage(msg));
+}
 process.stdin.on("data", (chunk) => {
   buffer += chunk.toString("utf8");
   let nl;
@@ -411,7 +425,7 @@ process.stdin.on("data", (chunk) => {
     buffer = buffer.slice(nl + 1);
     if (line) {
       const msg = JSON.parse(line);
-      queue = queue.then(() => withCodexRequest(msg, () => handle(msg)).catch(() => {}));
+      schedule(msg);
     }
   }
 });

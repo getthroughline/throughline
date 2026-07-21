@@ -232,6 +232,14 @@ const TOOLS = [
 ];
 
 async function callTool(name, args) {
+  const remoteCall = async () => {
+    const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-call", method: "tools/call", params: { name, arguments: args ?? {} } }, activeDecisionExchange({}, "claude"));
+    if (remote?.error) throw new Error(remote.error.message ?? `remote tool failed: ${name}`);
+    const content = remote?.result?.content ?? [];
+    const item = content.find((x) => x?.type === "text");
+    if (!item) return remote?.result ?? {};
+    try { return JSON.parse(item.text); } catch { return { text: item.text, isError: !!remote?.result?.isError }; }
+  };
   switch (name) {
     case "whoami": {
       const stale = staleNotice();
@@ -277,30 +285,18 @@ async function callTool(name, args) {
       return get("/reflect");
     case "complete_reflection":
       return post("/reflect/complete", { cursor: args.cursor });
-    case "confirm_events": {
-      const confirmed = [], notFound = [];
-      for (const id of args.ids ?? []) {
-        try { confirmed.push((await post("/capture/confirm", { id })).confirmed.id); }
-        catch { notFound.push(id); }
-      }
-      return { confirmed, notFound };
-    }
-    case "reject_events": {
-      const rejected = [];
-      for (const id of args.ids ?? []) {
-        const r = await post("/capture/reject", { id }).catch(() => ({ rejected: false }));
-        if (r.rejected) rejected.push(id);
-      }
-      return { rejected };
-    }
+    case "confirm_events":
+    case "reject_events":
+      return remoteCall();
     case "list_selves": {
       const [selves, cfg] = await Promise.all([rawGet("/selves"), rawGet("/config")]);
       return { selves: selves.selves, default: cfg.default_self ?? null, paused: !!cfg.paused };
     }
     case "create_self":
-      return rawPost(`/selves/${encodeURIComponent(args.name)}`, {});
+      return remoteCall();
     case "use_self": {
-      const r = await rawPost("/config", { default_self: args.name });
+      const r = await remoteCall();
+      if (r?.blocked || r?.error) return r;
       // re-point THIS session too — otherwise every later write lands on the old self
       const rebound = rebindSelf(args.name);
       return rebound ? r : { ...r, notice: `account default switched, but this session is pinned to "${await self()}" (env/.throughline) — the pin still applies here` };
@@ -313,20 +309,14 @@ async function callTool(name, args) {
       return r;
     }
     case "delete_self": {
-      const r = await rawDelete(`/selves/${encodeURIComponent(args.name)}`);
-      if (args.name === (await self())) rebindSelf(null); // re-resolve from account default next call
+      const r = await remoteCall();
+      if (!r?.blocked && !r?.error && args.name === (await self())) rebindSelf(null); // re-resolve from account default next call
       return r;
     }
     case "draft_persona":
-      return post("/capture/draft-persona", { docs: args.docs ?? [] });
-    default: {
-      const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-call", method: "tools/call", params: { name, arguments: args ?? {} } });
-      if (remote?.error) throw new Error(remote.error.message ?? `remote tool failed: ${name}`);
-      const content = remote?.result?.content ?? [];
-      const item = content.find((x) => x?.type === "text");
-      if (!item) return remote?.result ?? {};
-      try { return JSON.parse(item.text); } catch { return { text: item.text, isError: !!remote?.result?.isError }; }
-    }
+      return remoteCall();
+    default:
+      return remoteCall();
   }
 }
 

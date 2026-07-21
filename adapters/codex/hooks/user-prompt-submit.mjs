@@ -20,11 +20,11 @@ const emit = (additionalContext, systemMessage = "") => {
   process.stdout.write(JSON.stringify(output));
 };
 
-async function writeCodexStatus(name) {
+async function writeCodexStatus(name, source) {
   try {
     const statusDir = join(homedir(), ".throughline", "status");
     mkdirSync(statusDir, { recursive: true });
-    const status = JSON.stringify({ self: name, cwd: process.cwd(), ts: Date.now() });
+    const status = JSON.stringify({ self: name, source, cwd: process.cwd(), ts: Date.now() });
     writeFileSync(join(statusDir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
     writeFileSync(join(statusDir, "codex-current.json"), status);
     const threadId = codexThreadId(hookInput);
@@ -61,8 +61,8 @@ function liveClock(tz, offsetHours) {
 if (!hasKey() && !process.env.THROUGHLINE_URL) process.exit(0);
 if (sessionDisabled()) process.exit(0);
 
-await bindCodexRequest(hookInput);
-await writeCodexStatus(await safe(() => self(), "assistant"));
+const binding = await bindCodexRequest(hookInput);
+await writeCodexStatus(await safe(() => self(), "assistant"), binding.source);
 
 // ---- 1. the voice anchor: local files only (status cache → snapshot), zero network ----
 let anchor = "";

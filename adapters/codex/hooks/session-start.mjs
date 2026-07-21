@@ -13,7 +13,7 @@ const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
 };
 
-async function writeCodexStatus(name) {
+async function writeCodexStatus(name, source) {
   try {
     const { mkdirSync, writeFileSync } = await import("node:fs");
     const { createHash } = await import("node:crypto");
@@ -21,7 +21,7 @@ async function writeCodexStatus(name) {
     const { join } = await import("node:path");
     const dir = join(homedir(), ".throughline", "status");
     mkdirSync(dir, { recursive: true });
-    const status = JSON.stringify({ self: name, cwd: process.cwd(), ts: Date.now() });
+    const status = JSON.stringify({ self: name, source, cwd: process.cwd(), ts: Date.now() });
     writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
     writeFileSync(join(dir, "codex-current.json"), status);
     const threadId = codexThreadId(hookInput);
@@ -61,9 +61,9 @@ if (!hasKey() && !process.env.THROUGHLINE_URL) {
 
 if (sessionDisabled()) { emit(""); process.exit(0); }
 
-await bindCodexRequest(hookInput);
+const binding = await bindCodexRequest(hookInput);
 const SELF = await safe(() => self(), "assistant");
-await writeCodexStatus(SELF);
+await writeCodexStatus(SELF, binding.source);
 await pruneCodexStatus(); // best-effort housekeeping; session-start only, never the every-turn path
 // project identity for the cross-host handoff: the git repo name, else the folder name
 let PROJECT = "";
