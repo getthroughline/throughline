@@ -1,0 +1,55 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,Inter,system-ui,sans-serif;color:#0a0a0a;-webkit-font-smoothing:antialiased}
+    .card{border:1px solid #ececed;border-radius:16px;padding:18px 20px;background:#fff;max-width:560px}
+    .query{font-size:12.5px;color:#5f5f6b;margin-bottom:10px}
+    .event{display:flex;gap:11px;padding:11px 0;border-bottom:1px solid #f0f0f1;align-items:baseline}
+    .event:last-child{border-bottom:0}
+    .badge{flex:0 0 auto;font-size:10.5px;padding:2px 8px;border-radius:6px;font-weight:600;background:#eaf1ff;color:#155eef;white-space:nowrap}
+    .text{flex:1;font-size:14px;line-height:1.5;color:#26262e}
+    .date{flex:0 0 auto;font-size:11px;color:#9a9aa6;font-family:ui-monospace,monospace}
+    .grounded{font-size:10px;color:#155eef;margin-left:6px}
+    .empty{color:#9a9aa6;text-align:center;padding:18px 0;font-size:13px}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    (function(){
+      function esc(value) {
+        return String(value == null ? "" : value).replace(/[&<>"]/g, function(char) {
+          return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[char];
+        });
+      }
+      function render() {
+        var data = (window.openai && window.openai.toolOutput) || {};
+        var events = Array.isArray(data.events) ? data.events : [];
+        var html;
+        if (!events.length) {
+          html = '<div class="card"><div class="empty">No matching memories.</div></div>';
+        } else {
+          var rows = events.map(function(event) {
+            return '<div class="event"><span class="badge">' + esc(event.stream) + '</span>'
+              + '<div class="text">' + esc(event.summary)
+              + (event.grounded ? '<span class="grounded">⛓</span>' : '') + '</div>'
+              + '<span class="date">' + esc(event.ts) + '</span></div>';
+          }).join('');
+          html = '<div class="card">'
+            + (data.query ? '<div class="query">remembering “' + esc(data.query) + '”</div>' : '')
+            + rows + '</div>';
+        }
+        document.getElementById('root').innerHTML = html;
+      }
+      render();
+      window.addEventListener('openai:set_globals', render);
+      window.addEventListener('message', function(event) {
+        if (event.data && event.data.type && String(event.data.type).indexOf('tool') >= 0) render();
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -261,12 +261,12 @@ export function sessionDisabled() {
 
 export async function self() {
   if (scope()?.self) return scope().self;
-  if (cachedSelf && (cachedSource === "env" || cachedSource === "project" || cachedSource === "unbound-plugin")) return cachedSelf;
+  if (cachedSelf && (cachedSource === "env" || cachedSource === "unbound-plugin")) return cachedSelf;
   if (process.env.THROUGHLINE_SELF) { cachedSource = "env"; return (cachedSelf = process.env.THROUGHLINE_SELF); }
   const proj = projectSelf();
   if (proj) { cachedSource = "project"; return (cachedSelf = proj); }
   const status = codexStatusSelf();
-  if (status) { cachedSource = "codex-status"; return (cachedSelf = status); }
+  if (status) { cachedSource = "codex-status"; return (cachedSelf = status.self); }
   if (cachedSelf && cachedSource === "account-default") return cachedSelf;
   const account = await accountDefaultSelf();
   if (account) { cachedSource = "account-default"; return (cachedSelf = account); }

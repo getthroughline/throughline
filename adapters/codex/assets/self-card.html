@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,Inter,system-ui,sans-serif;color:#0a0a0a;-webkit-font-smoothing:antialiased}
+    .card{border:1px solid #ececed;border-radius:16px;padding:18px 20px;background:#fff;max-width:560px}
+    .head{display:flex;align-items:center;gap:13px;margin-bottom:12px}
+    .avatar{width:46px;height:46px;border-radius:13px;display:grid;place-items:center;font-weight:700;font-size:20px;color:#fff;flex:0 0 auto}
+    .name{font-size:18px;font-weight:680;letter-spacing:-.01em}
+    .continuity{font-size:12.5px;color:#5f5f6b;font-family:ui-monospace,monospace}
+    .blurb{font-size:14px;line-height:1.55;color:#26262e;white-space:pre-wrap;margin-top:6px}
+    .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:13px}
+    .chip{font-size:11px;padding:3px 9px;border-radius:999px;background:#f3f3f4;color:#5f5f6b}
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    (function(){
+      function esc(value) {
+        return String(value == null ? "" : value).replace(/[&<>"]/g, function(char) {
+          return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[char];
+        });
+      }
+      function hue(name) {
+        var value = 0;
+        for (var i = 0; i < name.length; i++) value = (value * 31 + name.charCodeAt(i)) >>> 0;
+        return value % 360;
+      }
+      function render() {
+        var data = (window.openai && window.openai.toolOutput) || {};
+        var name = String(data.self || 'self');
+        var color = hue(name);
+        var signals = Array.isArray(data.signals) ? data.signals : [];
+        var chips = signals.map(function(signal) {
+          return '<span class="chip">' + esc(signal) + '</span>';
+        }).join('');
+        document.getElementById('root').innerHTML = '<div class="card">'
+          + '<div class="head"><div class="avatar" style="background:linear-gradient(135deg,hsl('
+          + color + ' 70% 55%),hsl(' + ((color + 70) % 360) + ' 75% 45%))">'
+          + esc(name.charAt(0).toUpperCase() || '?') + '</div><div><div class="name">' + esc(name)
+          + '</div><div class="continuity">' + esc(data.continuity) + '</div></div></div>'
+          + (data.blurb ? '<div class="blurb">' + esc(data.blurb) + '</div>' : '')
+          + (chips ? '<div class="chips">' + chips + '</div>' : '') + '</div>';
+      }
+      render();
+      window.addEventListener('openai:set_globals', render);
+      window.addEventListener('message', function(event) {
+        if (event.data && event.data.type && String(event.data.type).indexOf('tool') >= 0) render();
+      });
+    })();
+  </script>
+</body>
+</html>

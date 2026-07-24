@@ -10,6 +10,19 @@ import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
 const SUPPORTED_PROTOCOL_VERSION = "2025-06-18";
+const ASSET_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "assets");
+const LOCAL_RESOURCES = new Map([
+  ["ui://widget/self-card.html", {
+    name: "self-card.html",
+    description: "The self's identity card — name and lived continuity.",
+    text: readFileSync(join(ASSET_DIR, "self-card.html"), "utf8"),
+  }],
+  ["ui://widget/memories.html", {
+    name: "memories.html",
+    description: "A list of recalled memories with their stream and date.",
+    text: readFileSync(join(ASSET_DIR, "memories.html"), "utf8"),
+  }],
+]);
 
 // --- staleness guard (mirrors the Claude Code server) ------------------------
 // An already-open session can stay bound to the OLD server process after `codex plugin add`
@@ -384,7 +397,32 @@ async function handle(msg) {
       return reply(id, { content: [{ type: "text", text: `error: ${err.message}` }], isError: true });
     }
   }
-  if (method === "resources/list" || method === "resources/read") {
+  if (method === "resources/list") {
+    return reply(id, {
+      resources: [...LOCAL_RESOURCES].map(([uri, resource]) => ({
+        uri,
+        name: resource.name,
+        mimeType: "text/html+skybridge",
+        description: resource.description,
+      })),
+    });
+  }
+  if (method === "resources/read") {
+    const uri = String(params?.uri ?? "");
+    if (!uri) return replyError(id, "resources/read requires a non-empty uri", -32602);
+    const resource = LOCAL_RESOURCES.get(uri);
+    if (resource) {
+      return reply(id, {
+        contents: [{
+          uri,
+          mimeType: "text/html+skybridge",
+          text: resource.text,
+          _meta: { "openai/widgetDescription": resource.description },
+        }],
+      });
+    }
+    // Unknown future templates may still be supplied by the cloud. The two templates advertised
+    // by this plugin never depend on that round trip, so a slow network cannot break recall UI.
     try {
       const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-resource", method, params: params ?? {} });
       return replyRemote(id, remote);

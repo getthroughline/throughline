@@ -26,7 +26,6 @@ async function writeCodexStatus(name, source) {
     mkdirSync(statusDir, { recursive: true });
     const status = JSON.stringify({ self: name, source, cwd: process.cwd(), ts: Date.now() });
     writeFileSync(join(statusDir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
-    writeFileSync(join(statusDir, "codex-current.json"), status);
     const threadId = codexThreadId(hookInput);
     if (threadId)
       writeFileSync(join(statusDir, `thread-${String(threadId).replace(/[^\w.-]/g, "_")}.json`), status);
