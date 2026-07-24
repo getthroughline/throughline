@@ -2,19 +2,16 @@
 // Minimal MCP stdio server (JSON-RPC 2.0, newline-delimited), no SDK / no deps.
 // Exposes the Throughline API to the host model as tools. The host model is the
 // extractor; this server is just the bridge.
-import { codexThreadId, get, getText, mcpRequest, post, rawDelete, rawGet, rawPost, rebindSelf, self, withCodexRequest } from "../lib/daemon.mjs";
+import { codexThreadId, get, getText, isAuthError, mcpRequest, post, rawDelete, rawGet, rawPost,
+  readSnapshot, rebindSelf, self, withCodexRequest, writeSnapshot } from "../lib/daemon.mjs";
 import { activeDecisionExchange } from "../lib/decision-receipt.mjs";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
-// Hooks stay fail-fast and fall back to the local self snapshot. An interactive MCP tool should
-// instead survive one cold cloud/TLS/DB path; its process is long-lived, so this cost is normally
-// paid once and later calls reuse warm connections.
-process.env.THROUGHLINE_TIMEOUT_MS ??= "30000";
-
 const SUPPORTED_PROTOCOL_VERSION = "2025-06-18";
+const WHOAMI_BOOTSTRAP_TIMEOUT_MS = Number(process.env.THROUGHLINE_WHOAMI_TIMEOUT_MS ?? "6000");
 const ASSET_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "assets");
 const LOCAL_RESOURCES = new Map([
   ["ui://widget/self-card.html", {
@@ -260,8 +257,25 @@ async function callTool(name, args, request = {}) {
   switch (name) {
     case "whoami": {
       const stale = staleNotice();
-      const bs = await rawGet(`/selves/${encodeURIComponent(await self())}/bootstrap`).catch(() => null);
-      if (bs) return { ...(stale ? { _stale: stale } : {}), paused: bs.paused, context: bs.context, reflection: bs.reflection, governance: bs.governance, pending: bs.pending };
+      const selfName = await self();
+      let bootstrapError = null;
+      const bs = await rawGet(`/selves/${encodeURIComponent(selfName)}/bootstrap`, WHOAMI_BOOTSTRAP_TIMEOUT_MS)
+        .catch((error) => { bootstrapError = error; return null; });
+      if (bs) {
+        writeSnapshot(selfName, bs.context, bs.voiceAnchor ?? "");
+        return { ...(stale ? { _stale: stale } : {}), paused: bs.paused, context: bs.context, reflection: bs.reflection, governance: bs.governance, pending: bs.pending };
+      }
+      if (bootstrapError && !isAuthError(bootstrapError)) {
+        const snapshot = readSnapshot(selfName);
+        if (snapshot) return {
+          ...(stale ? { _stale: stale } : {}),
+          paused: false,
+          context: snapshot.context,
+          offline: true,
+          offline_as_of: snapshot.ts,
+        };
+      }
+      if (bootstrapError && isAuthError(bootstrapError)) throw bootstrapError;
       const [context, cu] = await Promise.all([
         getText("/context").catch(() => ""),
         get("/catchup?body=mcp").catch(() => ({ events: [], count: 0 })),

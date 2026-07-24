@@ -37,8 +37,8 @@ function authHeaders(extra = {}) {
   };
 }
 
-async function fetchWithTimeout(url, init = {}) {
-  const timeoutMs = Number(process.env.THROUGHLINE_TIMEOUT_MS ?? "8000");
+async function fetchWithTimeout(url, init = {}, timeoutOverride) {
+  const timeoutMs = Number(timeoutOverride ?? process.env.THROUGHLINE_TIMEOUT_MS ?? "8000");
   if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return fetch(url, init);
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
@@ -237,8 +237,8 @@ export async function mcpRequest(message, exchange = null) {
   return res.json();
 }
 
-export async function rawGet(path) {
-  const res = await fetchWithTimeout(`${BASE}${path}`, { headers: authHeaders() });
+export async function rawGet(path, timeoutOverride) {
+  const res = await fetchWithTimeout(`${BASE}${path}`, { headers: authHeaders() }, timeoutOverride);
   if (!res.ok) throw await httpError(path, res);
   return res.json();
 }
