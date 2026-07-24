@@ -11,6 +11,7 @@ import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
 const WHOAMI_BOOTSTRAP_TIMEOUT_MS = Number(process.env.THROUGHLINE_WHOAMI_TIMEOUT_MS ?? "6000");
+const TOOL_DISCOVERY_TIMEOUT_MS = Number(process.env.THROUGHLINE_TOOL_DISCOVERY_TIMEOUT_MS ?? "1500");
 
 // --- staleness guard ---------------------------------------------------------
 // Claude Code spawns a fresh MCP server on `/plugin update`, but an already-open session
@@ -360,7 +361,11 @@ async function handle(msg) {
   if (method === "tools/list") {
     let remoteTools = [];
     try {
-      const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-list", method: "tools/list", params: {} });
+      const remote = await mcpRequest(
+        { jsonrpc: "2.0", id: "adapter-list", method: "tools/list", params: {} },
+        null,
+        TOOL_DISCOVERY_TIMEOUT_MS,
+      );
       remoteTools = Array.isArray(remote?.result?.tools) ? remote.result.tools : [];
     } catch { /* static list keeps the body usable offline */ }
     const merged = new Map(TOOLS.map((tool) => [tool.name, tool]));

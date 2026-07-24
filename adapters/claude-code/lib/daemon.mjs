@@ -223,7 +223,7 @@ export function hostTurnHeaders(exchange) {
   } : {};
 }
 
-export async function mcpRequest(message, exchange = null) {
+export async function mcpRequest(message, exchange = null, timeoutOverride) {
   const res = await fetchWithTimeout(`${BASE}/mcp`, {
     method: "POST",
     headers: authHeaders({
@@ -232,7 +232,7 @@ export async function mcpRequest(message, exchange = null) {
       ...hostTurnHeaders(exchange),
     }),
     body: JSON.stringify(message ?? {}),
-  });
+  }, timeoutOverride);
   if (!res.ok) throw await httpError("/mcp", res);
   return res.json();
 }

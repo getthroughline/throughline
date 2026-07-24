@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
-const targets = process.argv.slice(2).map(resolve);
+const targets = process.argv.slice(2).map((target) => resolve(target));
 if (!targets.length) targets.push(
   resolve("adapters/codex/mcp/server.mjs"),
   resolve("adapters/claude-code/mcp/server.mjs"),
@@ -24,16 +24,7 @@ writeFileSync(join(cacheDir, "cocomi.json"), JSON.stringify({
 }));
 
 const cloud = createServer(async (req, res) => {
-  res.setHeader("content-type", "application/json");
-  if (req.method === "POST" && req.url === "/mcp") {
-    const chunks = [];
-    for await (const chunk of req) chunks.push(chunk);
-    const msg = JSON.parse(Buffer.concat(chunks).toString("utf8"));
-    if (msg.method === "tools/list") {
-      return res.end(JSON.stringify({ jsonrpc: "2.0", id: msg.id, result: { tools: [] } }));
-    }
-  }
-  // A cold or unhealthy bootstrap never answers before the adapter's deadline.
+  // A cold or unhealthy cloud never answers before the adapter's deadline.
 });
 
 await new Promise((done) => cloud.listen(0, "127.0.0.1", done));

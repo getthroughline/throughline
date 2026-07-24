@@ -12,6 +12,7 @@ import { homedir } from "node:os";
 
 const SUPPORTED_PROTOCOL_VERSION = "2025-06-18";
 const WHOAMI_BOOTSTRAP_TIMEOUT_MS = Number(process.env.THROUGHLINE_WHOAMI_TIMEOUT_MS ?? "6000");
+const TOOL_DISCOVERY_TIMEOUT_MS = Number(process.env.THROUGHLINE_TOOL_DISCOVERY_TIMEOUT_MS ?? "1500");
 const ASSET_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "assets");
 const LOCAL_RESOURCES = new Map([
   ["ui://widget/self-card.html", {
@@ -367,7 +368,11 @@ function replyRemote(id, remote) {
 let canonicalToolsCache = null;
 async function canonicalTools() {
   if (canonicalToolsCache) return canonicalToolsCache;
-  const remote = await mcpRequest({ jsonrpc: "2.0", id: "adapter-list", method: "tools/list", params: {} });
+  const remote = await mcpRequest(
+    { jsonrpc: "2.0", id: "adapter-list", method: "tools/list", params: {} },
+    null,
+    TOOL_DISCOVERY_TIMEOUT_MS,
+  );
   if (remote?.error) throw new Error(remote.error.message ?? "remote tools/list failed");
   const tools = Array.isArray(remote?.result?.tools) ? remote.result.tools : [];
   if (tools.length) canonicalToolsCache = tools;
@@ -404,7 +409,10 @@ async function handle(msg) {
     try {
       // Apps SDK tools must preserve the canonical result envelope. Re-wrapping only text drops
       // structuredContent/_meta, so the widget may load but still receive no data.
-      const remoteTool = (await canonicalTools().catch(() => [])).find((tool) => tool?.name === params.name);
+      // Identity must not wait for optional Apps SDK metadata before it can read its own snapshot.
+      const remoteTool = params.name === "whoami"
+        ? null
+        : (await canonicalTools().catch(() => [])).find((tool) => tool?.name === params.name);
       if (appTemplateOf(remoteTool)) {
         const threadId = codexThreadId(msg);
         const exchange = activeDecisionExchange(threadId ? { thread_id: threadId } : {}, "codex");
