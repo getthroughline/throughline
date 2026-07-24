@@ -9,6 +9,11 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
+// Hooks stay fail-fast and fall back to the local self snapshot. An interactive MCP tool should
+// instead survive one cold cloud/TLS/DB path; its process is long-lived, so this cost is normally
+// paid once and later calls reuse warm connections.
+process.env.THROUGHLINE_TIMEOUT_MS ??= "30000";
+
 // --- staleness guard ---------------------------------------------------------
 // Claude Code spawns a fresh MCP server on `/plugin update`, but an already-open session
 // can stay bound to the OLD server process — silently serving outdated persona/memory logic

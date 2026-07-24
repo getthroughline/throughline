@@ -49,6 +49,10 @@ async function fetchWithTimeout(url, init = {}) {
   const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: init.signal ?? ctrl.signal });
+  } catch (error) {
+    if (ctrl.signal.aborted && !init.signal)
+      throw new Error(`Throughline request timed out after ${timeoutMs}ms`, { cause: error });
+    throw error;
   } finally {
     clearTimeout(timer);
   }
