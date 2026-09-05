@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
+import { snapshotStandingContext } from "./bootstrap-state.mjs";
 
 const CLOUD = "https://getthroughline.ai";
 const BASE = process.env.THROUGHLINE_URL ?? CLOUD;
@@ -416,7 +417,8 @@ export function readSnapshot(selfName, maxAgeDays = 14) {
     const s = JSON.parse(readFileSync(snapPath(selfName), "utf8"));
     if (!s?.context) return null;
     const ageDays = (Date.now() - Date.parse(s.ts)) / 86_400_000;
-    return Number.isFinite(ageDays) && ageDays <= maxAgeDays ? s : null;
+    return Number.isFinite(ageDays) && ageDays <= maxAgeDays
+      ? { ...s, context: snapshotStandingContext(s.context) } : null;
   } catch { return null; }
 }
 /** 401/403 from the cloud = key problem (fix it), anything else = transient (snapshot ok). */

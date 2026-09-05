@@ -42,7 +42,11 @@ try {
   try { PROJECT = basename(execSync("git rev-parse --show-toplevel", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim()); } catch { PROJECT = basename(process.cwd()); }
 } catch { /* no project context — fine */ }
 const bootstrapQuery = new URLSearchParams({ conversation_ref: decisionConversationRef(hookInput, "claude"), ...(PROJECT ? { project: PROJECT } : {}) });
-const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?${bootstrapQuery}`), null);
+let bs = null, bootstrapError = null;
+try {
+  bs = await rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?${bootstrapQuery}`,
+    process.env.THROUGHLINE_BOOTSTRAP_TIMEOUT_MS ?? process.env.THROUGHLINE_TIMEOUT_MS ?? 12000);
+} catch (error) { bootstrapError = error; }
 
 let paused, context, connFailed = false, authFailed = false;
 const signals = [];
@@ -89,8 +93,12 @@ if (bs) {
   if (reviewSignal) signals.push(reviewSignal);
   else if (bs.pending <= 0 && bs.starved)
     signals.push("## You've been under-capturing\nSessions happened this week but NO memory accrued — you talked without journalling. Fix it this session: journal at every natural breakpoint, and at a natural pause ask the user whether anything from the last few days is worth backfilling (they retell, you journal it — never reconstruct it yourself).");
+} else if (bootstrapError && ![404, 405].includes(Number(bootstrapError.status))) {
+  // Only a missing endpoint is legacy. A timeout must not fan out into more cloud reads.
+  connFailed = true;
+  authFailed = isAuthError(bootstrapError);
 } else {
-  // /bootstrap returned nothing. Two very different causes — distinguish them, never conflate:
+  // Legacy daemon: bootstrap really is unavailable.
   //   (a) a legacy self-host daemon with no /bootstrap endpoint → /config still works → proceed;
   //   (b) a real connection/auth failure (network, or an expired/rotated key that passed hasKey()
   //       which only checks PRESENCE) → /config ALSO fails. We must NOT pretend there's no self.

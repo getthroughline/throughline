@@ -75,7 +75,11 @@ try {
   try { PROJECT = basename(execSync("git rev-parse --show-toplevel", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim()); } catch { PROJECT = basename(process.cwd()); }
 } catch { /* no project context — fine */ }
 const bootstrapQuery = new URLSearchParams({ conversation_ref: decisionConversationRef(hookInput, "codex"), ...(PROJECT ? { project: PROJECT } : {}) });
-const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?${bootstrapQuery}`), null);
+let bs = null, bootstrapError = null;
+try {
+  bs = await rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?${bootstrapQuery}`,
+    process.env.THROUGHLINE_BOOTSTRAP_TIMEOUT_MS ?? process.env.THROUGHLINE_TIMEOUT_MS ?? 12000);
+} catch (error) { bootstrapError = error; }
 
 let paused, context, connFailed = false, authFailed = false;
 const signals = [];
@@ -90,8 +94,12 @@ if (bs) {
   if (reviewSignal) signals.push(reviewSignal);
   else if (bs.pending <= 0 && bs.starved)
     signals.push("## You've been under-capturing\nSessions happened this week but NO memory accrued. Fix it this session: journal at natural breakpoints, and at a pause ask the user if anything from recent days is worth backfilling (they retell, you journal — never reconstruct yourself).");
+} else if (bootstrapError && ![404, 405].includes(Number(bootstrapError.status))) {
+  // Only a missing endpoint is legacy. A timeout must not fan out into more cloud reads.
+  connFailed = true;
+  authFailed = isAuthError(bootstrapError);
 } else {
-  // distinguish a legacy daemon (no /bootstrap) from a real connection/auth failure — see claude-code hook.
+  // Legacy daemon: bootstrap really is unavailable.
   let cfg = null;
   try { cfg = await rawGet("/config"); } catch (e) { authFailed = isAuthError(e); }
   if (cfg === null) {

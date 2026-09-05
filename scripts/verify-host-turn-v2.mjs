@@ -116,11 +116,16 @@ const claudeReceipt = await import("../adapters/claude-code/lib/decision-receipt
 const { loadHostTurnDecision: loadCodexDecision } = await import("../adapters/codex/lib/host-turn-client.mjs");
 const { loadHostTurnDecision: loadClaudeDecision } = await import("../adapters/claude-code/lib/host-turn-client.mjs");
 for (const adapter of ["codex", "claude-code"]) {
-  const { personaPresence } = await import(`../adapters/${adapter}/lib/bootstrap-state.mjs`);
+  const { personaPresence, snapshotStandingContext } = await import(`../adapters/${adapter}/lib/bootstrap-state.mjs`);
   assert.equal(personaPresence({}, "## Founding soul inheritance\nAn identity"), true);
   assert.equal(personaPresence({}, "Speak and act as this self"), true);
   assert.equal(personaPresence({}, "A changed but unrecognized format"), null);
   assert.equal(personaPresence({ hasPersona: false }, ""), false);
+  const oldSnapshot = "# Self context\nidentity remains\n## Current conversation commitment\nwrong previous line\n\n## Shared present uptake\nwrong current subject\n## Learned tone\ntone remains\n## Canonical turn\nold act";
+  const standing = snapshotStandingContext(oldSnapshot);
+  assert.match(standing, /identity remains/);
+  assert.match(standing, /tone remains/);
+  assert.doesNotMatch(standing, /wrong previous|wrong current|old act|Canonical turn/);
 }
 
 const runHook = (relativePath, input, extraEnv = {}) => new Promise((resolve, reject) => {
@@ -421,6 +426,11 @@ try {
     const start = JSON.parse((await runHook(startupPath, { session_id: `start-${hostCase.host}` })).stdout);
     assert.doesNotMatch(start.hookSpecificOutput.additionalContext, /No persona yet/);
     assert.match(start.hookSpecificOutput.additionalContext, /Founding soul inheritance/);
+    bootstrapMode = "failure";
+    const offlineStart = requests.length;
+    const offline = JSON.parse((await runHook(startupPath, { session_id: `offline-${hostCase.host}` })).stdout);
+    assert.match(offline.hookSpecificOutput.additionalContext, /offline copy/);
+    assert.equal(requests.slice(offlineStart).length, 1, "bootstrap failure must not fan out into legacy calls");
     bootstrapMode = "empty";
     const empty = JSON.parse((await runHook(startupPath, { session_id: `empty-${hostCase.host}` })).stdout);
     assert.match(empty.hookSpecificOutput.additionalContext, /No persona yet/);
