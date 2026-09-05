@@ -33,7 +33,12 @@ export async function loadHostTurnDecision(input, host, selfName, prompt) {
   try {
     exchange = prepareDecisionExchange(input, host, prompt);
     if (!exchange) return { context: "", systemMessage: "" };
-    const response = await rawGet(decisionRequestPath(selfName, exchange));
+    const response = await rawGet(decisionRequestPath(selfName, exchange),
+      process.env.THROUGHLINE_TURN_TIMEOUT_MS ?? process.env.THROUGHLINE_TIMEOUT_MS ?? 12000);
+    if (response?.paused === true) {
+      closeDecisionExchange(input, host, exchange.capture_ref, "paused");
+      return { context: String(response.context ?? ""), systemMessage: "", paused: true };
+    }
     if (response?.protocol === 2) {
       try {
         rememberDecisionReceipt(input, host, prompt, exchange, response);
@@ -72,6 +77,14 @@ export async function loadHostTurnDecision(input, host, selfName, prompt) {
     }
     // Network, timeout and local persistence failures stay fail-soft. The caller still emits its
     // local anchor, and no receipt means Stop cannot turn this unadmitted output into self-history.
-    return { context: "", systemMessage: "", transientFailure: true };
+    return {
+      context: "# Throughline turn refresh unavailable\n"
+        + "This turn's live continuity could not be loaded. Keep the existing identity and visible "
+        + "conversation; this is not evidence of missing identity or lost relationships. Do not "
+        + "treat an old cross-body conversation as the current exchange, or claim a fresh decision "
+        + "or saved shared memory. Use relevant recall if history is needed; do not invent it.",
+      systemMessage: "Throughline: live continuity refresh failed; existing context retained, shared capture unavailable for this turn.",
+      transientFailure: true,
+    };
   }
 }

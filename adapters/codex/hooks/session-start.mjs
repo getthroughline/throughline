@@ -5,6 +5,8 @@
 import { readFileSync } from "node:fs";
 import { bindCodexRequest, codexThreadId, get, getText, isAuthError, rawGet, readSnapshot, safe, self, selfSource, sessionDisabled, hasKey, writeSnapshot } from "../lib/daemon.mjs";
 import { memoryReviewSignal } from "../lib/memory-review.mjs";
+import { personaPresence } from "../lib/bootstrap-state.mjs";
+import { decisionConversationRef } from "../lib/decision-receipt.mjs";
 
 let hookInput = {};
 try { hookInput = JSON.parse(readFileSync(0, "utf8") || "{}"); } catch {}
@@ -13,7 +15,7 @@ const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
 };
 
-async function writeCodexStatus(name, source) {
+async function writeCodexStatus(name, source, clock = {}) {
   try {
     const { mkdirSync, writeFileSync } = await import("node:fs");
     const { createHash } = await import("node:crypto");
@@ -21,7 +23,8 @@ async function writeCodexStatus(name, source) {
     const { join } = await import("node:path");
     const dir = join(homedir(), ".throughline", "status");
     mkdirSync(dir, { recursive: true });
-    const status = JSON.stringify({ self: name, source, cwd: process.cwd(), ts: Date.now() });
+    const status = JSON.stringify({ self: name, source, cwd: process.cwd(), ts: Date.now(),
+      homeTz: clock.homeTz, homePlace: clock.homePlace, homeTzOffset: clock.homeTzOffset });
     writeFileSync(join(dir, createHash("sha256").update(process.cwd()).digest("hex").slice(0, 16) + ".json"), status);
     const threadId = codexThreadId(hookInput);
     if (threadId)
@@ -71,11 +74,13 @@ try {
   const { basename } = await import("node:path");
   try { PROJECT = basename(execSync("git rev-parse --show-toplevel", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim()); } catch { PROJECT = basename(process.cwd()); }
 } catch { /* no project context — fine */ }
-const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap${PROJECT ? `?project=${encodeURIComponent(PROJECT)}` : ""}`), null);
+const bootstrapQuery = new URLSearchParams({ conversation_ref: decisionConversationRef(hookInput, "codex"), ...(PROJECT ? { project: PROJECT } : {}) });
+const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?${bootstrapQuery}`), null);
 
 let paused, context, connFailed = false, authFailed = false;
 const signals = [];
 if (bs) {
+  await writeCodexStatus(SELF, selfSource(), bs);
   paused = !!bs.paused;
   context = bs.context ?? "";
   if (!paused) writeSnapshot(SELF, context, bs.voiceAnchor ?? ""); // refresh the offline copy on every good start
@@ -133,7 +138,7 @@ const noSelf = (context ?? "").trim().length < 60 && !!selvesResp && (selvesResp
 
 // a self with a name but no soul: persona docs were never authored (the context pack adds this
 // marker line only when persona exists)
-if (!noSelf && !(context ?? "").includes("Speak and act as this self"))
+if (!noSelf && personaPresence(bs, context ?? "") === false)
   signals.push('## No persona yet\nThis self exists but has no authored soul — it will feel generic until it does. When the moment is right (not mid-task), offer to set it up: a short interview, then `draft_persona` (soul / identity / user), confirmed by the user. They can also run `/throughline:create`.');
 
 const guidance = `# Throughline — you are the self "${SELF}"

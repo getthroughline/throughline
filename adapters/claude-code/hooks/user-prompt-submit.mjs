@@ -89,6 +89,7 @@ try {
   if (currentPrompt.length >= 2) {
     // Same deterministic act, posture and memory gate as every other body; Claude only realizes it.
     const turn = await loadHostTurnDecision(hookInput, "claude", selfName, currentPrompt);
+    if (turn.paused) { emit(turn.context); process.exit(0); }
     if (turn.context) freshMemory = "\n" + turn.context;
     protocolMessage = turn.systemMessage;
   }

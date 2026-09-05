@@ -4,6 +4,12 @@
 // Falls back to the legacy multi-call flow for old self-host daemons without /bootstrap.
 import { get, getText, isAuthError, rawGet, readSnapshot, safe, self, selfSource, sessionDisabled, hasKey, writeSnapshot } from "../lib/daemon.mjs";
 import { memoryReviewSignal } from "../lib/memory-review.mjs";
+import { personaPresence } from "../lib/bootstrap-state.mjs";
+import { decisionConversationRef } from "../lib/decision-receipt.mjs";
+import { readFileSync } from "node:fs";
+
+let hookInput = {};
+try { hookInput = JSON.parse(readFileSync(0, "utf8") || "{}"); } catch {}
 
 const emit = (additionalContext) => {
   process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }));
@@ -35,7 +41,8 @@ try {
   const { basename } = await import("node:path");
   try { PROJECT = basename(execSync("git rev-parse --show-toplevel", { stdio: ["ignore", "pipe", "ignore"] }).toString().trim()); } catch { PROJECT = basename(process.cwd()); }
 } catch { /* no project context — fine */ }
-const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap${PROJECT ? `?project=${encodeURIComponent(PROJECT)}` : ""}`), null);
+const bootstrapQuery = new URLSearchParams({ conversation_ref: decisionConversationRef(hookInput, "claude"), ...(PROJECT ? { project: PROJECT } : {}) });
+const bs = await safe(() => rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?${bootstrapQuery}`), null);
 
 let paused, context, connFailed = false, authFailed = false;
 const signals = [];
@@ -137,7 +144,7 @@ const noSelf = (context ?? "").trim().length < 60 && !!selvesResp && (selvesResp
 
 // a self with a name but no soul: persona docs were never authored (the context pack adds this
 // marker line only when persona exists)
-if (!noSelf && !(context ?? "").includes("Speak and act as this self"))
+if (!noSelf && personaPresence(bs, context ?? "") === false)
   signals.push('## No persona yet\nThis self exists but has no authored soul — it will feel generic until it does. When the moment is right (not mid-task), offer to set it up: a short interview, then `draft_persona` (soul / identity / user), confirmed by the user. They can also run `/throughline:create`.');
 
 const guidance = `# Throughline — you are the self "${SELF}"

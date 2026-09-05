@@ -17,6 +17,7 @@ const decisions = new Map();
 const outputs = new Map();
 let decisionMode = "success";
 let captureMode = "success";
+let bootstrapMode = "success";
 
 const send = (response, status, body) => {
   response.writeHead(status, { "content-type": "application/json" });
@@ -39,13 +40,16 @@ const server = createServer(async (request, response) => {
   };
   requests.push(record);
 
-  if (url.pathname.endsWith("/bootstrap")) return send(response, 200, {
-    paused: false, context: "bootstrap", pending: 0, homeTz: "Asia/Tokyo", homePlace: "Tokyo",
+  if (url.pathname.endsWith("/bootstrap")) return send(response, bootstrapMode === "failure" ? 503 : 200, {
+    paused: false, hasPersona: bootstrapMode === "empty" ? false : true,
+    context: "# Self context — cocomi\n## Founding soul inheritance\nAn authored identity with more than sixty characters of actual context.", pending: 0, homeTz: "Asia/Tokyo", homePlace: "Tokyo",
   });
   if (url.pathname.endsWith("/recall")) return send(response, 200, {
     events: [{ ts: "2026-07-19", stream: "experience", body: { content: "legacy read-only memory" } }],
   });
   if (url.pathname.endsWith("/decision")) {
+    if (decisionMode === "paused") return send(response, 200, { paused: true, context: "# Throughline is paused" });
+    if (decisionMode === "slow") await new Promise((resolve) => setTimeout(resolve, 2700));
     if (decisionMode === "upgrade") return send(response, 426, {
       error: "host turn protocol v2 requires non-empty conversation_ref and a stable capture_ref",
       code: "host_turn_protocol_v2_required",
@@ -111,6 +115,13 @@ const codexReceipt = await import("../adapters/codex/lib/decision-receipt.mjs");
 const claudeReceipt = await import("../adapters/claude-code/lib/decision-receipt.mjs");
 const { loadHostTurnDecision: loadCodexDecision } = await import("../adapters/codex/lib/host-turn-client.mjs");
 const { loadHostTurnDecision: loadClaudeDecision } = await import("../adapters/claude-code/lib/host-turn-client.mjs");
+for (const adapter of ["codex", "claude-code"]) {
+  const { personaPresence } = await import(`../adapters/${adapter}/lib/bootstrap-state.mjs`);
+  assert.equal(personaPresence({}, "## Founding soul inheritance\nAn identity"), true);
+  assert.equal(personaPresence({}, "Speak and act as this self"), true);
+  assert.equal(personaPresence({}, "A changed but unrecognized format"), null);
+  assert.equal(personaPresence({ hasPersona: false }, ""), false);
+}
 
 const runHook = (relativePath, input, extraEnv = {}) => new Promise((resolve, reject) => {
   const child = spawn(process.execPath, [join(root, relativePath)], {
@@ -376,9 +387,44 @@ try {
       transcript_path: join(scratch, `${hostCase.host}-transient.jsonl`),
     });
     const transientOutput = JSON.parse(transientResult.stdout);
-    assert.equal(transientOutput.systemMessage, undefined, "transient failures remain fail-soft");
+    assert.match(transientOutput.systemMessage, /live continuity refresh failed/);
+    assert.match(transientOutput.hookSpecificOutput.additionalContext, /not evidence of missing identity or lost relationships/);
     assert.match(transientOutput.hookSpecificOutput.additionalContext, /This host is only the body/);
     decisionMode = "success";
+    bootstrapMode = "failure";
+    const directStart = requests.length;
+    const direct = JSON.parse((await runHook(hostCase.promptHook, {
+      prompt: "continue current work", session_id: `direct-${hostCase.host}`,
+    })).stdout);
+    assert.match(direct.hookSpecificOutput.additionalContext, /v2 context for continue current work/);
+    assert.equal(requests.slice(directStart).some((entry) => entry.path.endsWith("/bootstrap")), false,
+      "the current decision must not depend on heavyweight bootstrap");
+    decisionMode = "slow";
+    const slow = JSON.parse((await runHook(hostCase.promptHook, {
+      prompt: "a slow but healthy turn", session_id: `slow-${hostCase.host}`,
+    }, { THROUGHLINE_TIMEOUT_MS: "", THROUGHLINE_TURN_TIMEOUT_MS: "12000" })).stdout);
+    assert.match(slow.hookSpecificOutput.additionalContext, /v2 context for a slow but healthy turn/);
+    const timedOut = JSON.parse((await runHook(hostCase.promptHook, {
+      prompt: "timeout must be visible", session_id: `timeout-${hostCase.host}`,
+    }, { THROUGHLINE_TURN_TIMEOUT_MS: "50" })).stdout);
+    assert.match(timedOut.systemMessage, /live continuity refresh failed/);
+    assert.match(timedOut.hookSpecificOutput.additionalContext, /turn refresh unavailable/);
+    decisionMode = "paused";
+    const paused = JSON.parse((await runHook(hostCase.promptHook, {
+      prompt: "paused turn", session_id: `paused-${hostCase.host}`,
+    })).stdout);
+    assert.match(paused.hookSpecificOutput.additionalContext, /Throughline is paused/);
+    assert.doesNotMatch(paused.hookSpecificOutput.additionalContext, /You are still/);
+    decisionMode = "success";
+    bootstrapMode = "success";
+    const startupPath = hostCase.promptHook.replace("user-prompt-submit.mjs", "session-start.mjs");
+    const start = JSON.parse((await runHook(startupPath, { session_id: `start-${hostCase.host}` })).stdout);
+    assert.doesNotMatch(start.hookSpecificOutput.additionalContext, /No persona yet/);
+    assert.match(start.hookSpecificOutput.additionalContext, /Founding soul inheritance/);
+    bootstrapMode = "empty";
+    const empty = JSON.parse((await runHook(startupPath, { session_id: `empty-${hostCase.host}` })).stdout);
+    assert.match(empty.hookSpecificOutput.additionalContext, /No persona yet/);
+    bootstrapMode = "success";
   }
 
   assert.equal(
