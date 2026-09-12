@@ -34,7 +34,7 @@ export async function loadHostTurnDecision(input, host, selfName, prompt) {
     exchange = prepareDecisionExchange(input, host, prompt);
     if (!exchange) return { context: "", systemMessage: "" };
     const response = await rawGet(decisionRequestPath(selfName, exchange),
-      process.env.THROUGHLINE_TURN_TIMEOUT_MS ?? process.env.THROUGHLINE_TIMEOUT_MS ?? 12000);
+      process.env.THROUGHLINE_TURN_TIMEOUT_MS ?? process.env.THROUGHLINE_TIMEOUT_MS ?? 20000);
     if (response?.paused === true) {
       closeDecisionExchange(input, host, exchange.capture_ref, "paused");
       return { context: String(response.context ?? ""), systemMessage: "", paused: true };

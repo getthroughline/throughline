@@ -11,7 +11,8 @@ import { dirname, join } from "node:path";
 import { homedir } from "node:os";
 
 const SUPPORTED_PROTOCOL_VERSION = "2025-06-18";
-const WHOAMI_BOOTSTRAP_TIMEOUT_MS = Number(process.env.THROUGHLINE_WHOAMI_TIMEOUT_MS ?? "6000");
+// Whole-self reads can legitimately take 10–15s; match the host refresh budget.
+const WHOAMI_BOOTSTRAP_TIMEOUT_MS = Number(process.env.THROUGHLINE_WHOAMI_TIMEOUT_MS ?? "20000");
 const TOOL_DISCOVERY_TIMEOUT_MS = Number(process.env.THROUGHLINE_TOOL_DISCOVERY_TIMEOUT_MS ?? "1500");
 const ASSET_DIR = join(dirname(fileURLToPath(import.meta.url)), "..", "assets");
 const LOCAL_RESOURCES = new Map([

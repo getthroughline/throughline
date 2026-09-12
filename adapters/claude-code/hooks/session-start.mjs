@@ -45,7 +45,7 @@ const bootstrapQuery = new URLSearchParams({ conversation_ref: decisionConversat
 let bs = null, bootstrapError = null;
 try {
   bs = await rawGet(`/selves/${encodeURIComponent(SELF)}/bootstrap?${bootstrapQuery}`,
-    process.env.THROUGHLINE_BOOTSTRAP_TIMEOUT_MS ?? process.env.THROUGHLINE_TIMEOUT_MS ?? 12000);
+    process.env.THROUGHLINE_BOOTSTRAP_TIMEOUT_MS ?? process.env.THROUGHLINE_TIMEOUT_MS ?? 20000);
 } catch (error) { bootstrapError = error; }
 
 let paused, context, connFailed = false, authFailed = false;
