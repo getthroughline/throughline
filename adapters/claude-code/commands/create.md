@@ -7,6 +7,11 @@ Help me create a new self named "$ARGUMENTS" (if no name was given, ask for one 
 lowercase, e.g. `work`, `juno`, `advisor`).
 
 Follow this flow exactly:
+**Language:** run the interview and write every draft — including markdown headings, labels and
+list items — entirely in the language I write in (e.g. all Simplified Chinese if I write Chinese,
+all English if I write English). Never mix languages inside or across the docs; keep proper nouns
+(names of people, characters, works, brands) as they are normally written.
+
 
 1. **Create:** call `create_self` with the name.
 2. **Interview me, briefly** — 4-6 questions, one at a time, conversational not bureaucratic:
