@@ -225,7 +225,8 @@ const TOOLS = [
     description:
       "Author/edit this self's persona, ONLY when the user explicitly asks to create or change it. " +
       "Interview the user (who the self should be, who they are, the relationship), then draft the " +
-      "documents and call this. Each doc is a markdown string. Slots: 'soul' (core: character, " +
+      "documents and call this. Each doc is a markdown string, written entirely in the language the " +
+      "user writes in (headings included; never mix languages; keep proper nouns as-is). Slots: 'soul' (core: character, " +
       "voice, principles), 'identity' (fuller dossier), 'user' (about the user). The drafts are " +
       "STAGED — show them to the user and call confirm_events with the returned ids only after they approve.",
     inputSchema: {
